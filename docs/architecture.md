@@ -5,12 +5,12 @@ Proxmox VE
 └── Debian 13 generic cloud VM
     ├── Cloud-Init
     ├── OpenSSH
-    ├── QEMU Guest Agent option
+    ├── QEMU Guest Agent option + guest package
     │
-    └── future application layer
+    └── guest runtime layer
         ├── Hermes Agent
         ├── Chromium
-        └── optional lightweight GUI desktop
+        └── lightweight XFCE/X11 desktop
 ```
 
 ## Why a VM
@@ -27,8 +27,8 @@ the application to the Proxmox host or to a container's host kernel.
   network initialization.
 - The base validation layer proves the operating system and administrative
   access before any application layer is installed.
-- A future Hermes layer owns the application, browser profile, desktop, and
-  automation dependencies.
+- The guest runtime scripts own Hermes, the dedicated browser profile, the
+  desktop session, and automation dependencies.
 
 Keeping the application layer separate makes a failed browser bootstrap
 recoverable without changing the VM identity or base access path.

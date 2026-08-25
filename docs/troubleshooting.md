@@ -24,8 +24,25 @@ scan or select an address solely because it responds.
 ## Guest Agent unavailable
 
 `agent: 1` in `qm config` enables the Proxmox integration but does not install
-the guest package. Report the distinction. Install only the narrowly required
-package in a separately approved task.
+the guest package. Report the distinction. The runtime bootstrap installs the
+Debian `qemu-guest-agent` package and starts its static service; validate both
+the guest service and the Proxmox `qm agent` response.
+
+## LightDM starts but no XFCE session
+
+On a Debian generic-cloud VM, logind can report `CanGraphical=no` even when an
+EFI framebuffer and Xorg are available. Confirm the actual `loginctl` seat and
+LightDM journal. The runtime drop-in uses `start-default-seat=true` and
+`logind-check-graphical=false` for this VM shape. If the session exists but
+XFCE components do not start, confirm that the hermes-owned `.config` and
+`.local` directories are writable and that `dbus-user-session` is installed.
+
+## SSH command cannot reach the desktop
+
+SSH does not inherit the LightDM session's display or D-Bus variables. Run the
+command through `~/.local/bin/hermes-graphical` after the session helper has
+captured the environment. Do not guess `DISPLAY=:0`; use the value observed by
+`loginctl` and the XFCE process environment.
 
 ## SSH lockout risk
 

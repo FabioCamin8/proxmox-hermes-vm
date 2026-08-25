@@ -4,9 +4,10 @@ Reproducible Proxmox VE deployment guidance for a Debian generic cloud VM
 prepared for Hermes Agent, secure SSH access, VirtIO devices, and an optional
 visible Linux desktop/browser environment.
 
-This repository separates a small, auditable base-VM handoff from the future
-Hermes, desktop, and browser layer. It does not install Hermes Agent,
-Chromium, a desktop, Docker, or browser automation software.
+This repository separates a small, auditable base-VM handoff from the
+Hermes/desktop/browser runtime layer. The runtime is installed by explicit
+guest-side scripts and keeps provider credentials and personal workflows out
+of the repository.
 
 ## Status
 
@@ -25,11 +26,11 @@ Proxmox VE
 └── Debian 13 generic cloud VM
     ├── Cloud-Init
     ├── OpenSSH
-    ├── optional QEMU Guest Agent
-    └── future application layer
+    ├── QEMU Guest Agent
+    └── guest runtime layer
         ├── Hermes Agent
         ├── Chromium
-        └── optional lightweight GUI desktop
+        └── lightweight XFCE/X11 desktop
 ```
 
 A VM is appropriate for a browser/computer-use deployment because it provides
@@ -61,6 +62,30 @@ cp config/example.env config/local.env
 The dry run is an intentional stop point in this initial repository. Review
 the plan and storage/image choices before implementing or enabling an apply
 path. Never delete an existing VM to make a deployment succeed.
+
+## Guest runtime
+
+After the base VM is reachable as the non-root administrative user, run the
+runtime scripts inside the guest:
+
+```bash
+sudo ./scripts/bootstrap-desktop.sh
+sudo env ENABLE_AUTOLOGIN=true ./scripts/bootstrap-desktop.sh
+sudo env HERMES_COMMIT=<official-hermes-commit> ./scripts/bootstrap-hermes.sh
+```
+
+The first desktop command keeps LightDM autologin disabled. Enable autologin
+only when an unattended graphical session is an explicit requirement. The
+desktop and Hermes validators are run as `hermes`:
+
+```bash
+HERMES_USER=hermes REQUIRE_AUTOLOGIN=true ./scripts/validate-desktop.sh
+./scripts/validate-hermes.sh
+```
+
+See [docs/desktop.md](docs/desktop.md), [docs/browser.md](docs/browser.md),
+and [docs/hermes.md](docs/hermes.md) for the verified boundaries and known
+Debian/XFCE behavior.
 
 ## Configuration
 
@@ -148,22 +173,20 @@ See `docs/findings.md` for evidence-backed details. The important ones are:
 5. On the tested Debian cloud-init version, `cloud-init status --short` was
    unsupported; `cloud-init status --long` was the reliable check.
 
-## Future Hermes/browser layer
+## Runtime boundary
 
-Future work may add separate `bootstrap-hermes.sh` and
-`bootstrap-desktop.sh` scripts. Keep headless browser operation conceptually
-separate from a visible desktop and Chromium session. The later layer should
-address persistent browser profiles, browser automation, computer-use, and
-console visibility without making the base Cloud-Init document a large
-application installer.
+Keep Hermes browser tools conceptually separate from the visible Debian
+Chromium session. The runtime scripts do not modify the base Cloud-Init
+document, do not install Docker or standalone VNC, and do not configure
+provider credentials. The visible browser's CDP endpoint is loopback-only.
 
 ## Limitations
 
-This initial repository does not implement or validate the apply path for
-creating a new VM, installing Hermes, installing a GUI/browser stack, or
-provisioning application credentials. Image URLs and checksums must be
-reviewed at deployment time. Storage behavior, MTU, guest-agent packaging,
-and graphical dependencies remain environment-specific.
+This repository still does not implement or validate the apply path for
+creating a new VM from scratch. Image URLs and checksums must be reviewed at
+deployment time. Storage behavior, MTU, guest-agent packaging, and graphical
+dependencies remain environment-specific. A semantic Hermes task and
+provider authentication remain manual steps.
 
 ## License
 
