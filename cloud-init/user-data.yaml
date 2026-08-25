@@ -1,0 +1,18 @@
+#cloud-config
+#
+# Template only. Render the ${...} values before use, or use the Proxmox qm
+# --ciuser/--sshkeys options as shown in the documentation.
+
+hostname: ${VM_NAME}
+manage_etc_hosts: true
+fqdn: ${VM_NAME}
+package_upgrade: false
+
+users:
+  - name: ${CI_USER}
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ${SSH_PUBLIC_KEY}

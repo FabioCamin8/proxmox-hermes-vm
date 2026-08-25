@@ -1,0 +1,3 @@
+# Template only. Use a unique value per VM/image instance.
+instance-id: ${INSTANCE_ID}
+local-hostname: ${VM_NAME}
