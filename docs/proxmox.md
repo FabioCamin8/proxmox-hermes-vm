@@ -65,3 +65,20 @@ qm cloudinit dump <VMID> meta
 `qm cloudinit dump` is the automatically generated view. If `cicustom` is in
 use, inspect the referenced snippet and, where necessary, the attached
 `cidata` volume as well.
+
+## Community Scripts prior art
+
+The upstream Community Scripts Debian 13 installer is useful for understanding
+the image and PVE wiring, but it is not copied into this repository. The
+current source selects the official Debian 13 `genericcloud` image when
+Cloud-Init is enabled and the `nocloud` image otherwise. It downloads without
+checksum verification, customizes the image with `virt-customize`, creates the
+VM with OVMF/optional q35, VirtIO networking, `virtio-scsi-pci`, serial0, the
+Agent option, and attaches Cloud-Init as `scsi1` in Cloud-Init mode.
+
+Its storage branch varies disk format, extension, and discard/SSD flags by
+backend. Its Cloud-Init image customization enables root and password SSH
+settings, so a secure deployment must verify the non-root key path and apply
+an explicit hardening drop-in afterward. Its error cleanup can destroy the
+selected VMID. These behaviors are documented findings, not defaults that
+this repository silently inherits.

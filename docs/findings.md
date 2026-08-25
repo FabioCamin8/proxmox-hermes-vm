@@ -13,6 +13,41 @@ Status: VERIFIED
 - Debian GNU/Linux 13.6 genericcloud guest.
 - Cloud-Init 25.1.4.
 
+## Community Scripts prior art
+
+Status: VERIFIED from the current upstream script source; not treated as the
+repository implementation
+
+Finding: the current `debian-13-vm.sh` selects the official Debian cloud image
+URL based on the Cloud-Init choice. Cloud-Init mode uses the Debian 13
+`genericcloud` image; the non-Cloud-Init path uses the `nocloud` image. The
+script downloads the selected URL but does not verify a checksum.
+
+Finding: storage is selected from `pvesm status -content images`. The script
+uses different extensions/import formats for directory/NFS, btrfs, and other
+backends. Its `THIN` flags add discard and SSD emulation for backends where
+that branch applies; directory/NFS and btrfs use different handling. Advanced
+disk cache selection is either the default/omitted cache or write-through.
+
+Finding: VM creation requests OVMF, host-selected or KVM64 CPU, an optional
+q35 machine, VirtIO networking, a generated MAC, `virtio-scsi-pci`, serial0,
+the QEMU Guest Agent option, and SCSI boot order. In Cloud-Init mode it adds a
+dedicated `scsi1` Cloud-Init drive. It optionally puts VLAN and MTU attributes
+on the virtual NIC; a guest MTU still requires end-to-end network support.
+
+Finding: the script customizes the Cloud-Init image before import, including
+hostname and machine-id preparation. In Cloud-Init mode it explicitly changes
+the image's `PermitRootLogin` and `PasswordAuthentication` settings to yes;
+the script does not establish the final non-root hardening policy.
+
+Finding: on errors, its cleanup trap stops and destroys the VMID it believes it
+created. The repository deliberately requires an unused VMID and refuses
+destructive cleanup or recreation.
+
+Implication: the repository uses the upstream script as behavioral prior art,
+not as code to copy. It requires explicit image provenance/checksum handling,
+non-destructive VM identity checks, and a reviewed SSH transition.
+
 ## Cloud-Init drive
 
 Status: VERIFIED
