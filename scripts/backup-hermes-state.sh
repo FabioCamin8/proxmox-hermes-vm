@@ -163,6 +163,7 @@ if ! backup_restic backup \
     --tag hermes-state \
     --tag hermes-state-data \
     --tag hermes-format-v1 \
+    --json \
     --exclude='*/Cache/*' \
     --exclude='*/Code Cache/*' \
     --exclude='*/GPUCache/*' \
@@ -180,11 +181,18 @@ if ! backup_restic backup \
     backup_die 'encrypted restic backup failed; no sensitive command output is displayed'
 fi
 
+source_files=$(backup_json_number total_files_processed "$temp_dir/restic-backup.log")
+source_bytes=$(backup_json_number total_bytes_processed "$temp_dir/restic-backup.log")
+stored_bytes=$(backup_json_number data_added "$temp_dir/restic-backup.log")
+[[ -n "$source_files" && -n "$source_bytes" && -n "$stored_bytes" ]] \
+    || backup_die 'restic backup summary did not contain required size metrics'
+
 if ! backup_restic backup \
     --stdin \
     --stdin-filename hermes-state-manifest.txt \
     --tag hermes-state \
     --tag hermes-state-metadata \
+    --json \
     <"$metadata_file" >"$temp_dir/restic-metadata.log" 2>&1; then
     backup_die 'encrypted metadata backup failed; no sensitive command output is displayed'
 fi
@@ -218,6 +226,9 @@ fi
 
 printf 'backup_snapshot=%s\n' "$snapshot_id"
 printf 'metadata_snapshot=%s\n' "$metadata_snapshot_id"
+printf 'source_files_processed=%s\n' "$source_files"
+printf 'source_bytes_processed=%s\n' "$source_bytes"
+printf 'stored_bytes_added=%s\n' "$stored_bytes"
 printf 'manifest_sha256=%s\n' "$(sha256sum "$manifest_file" | awk '{print $1}')"
 printf 'metadata_sha256=%s\n' "$(sha256sum "$metadata_file" | awk '{print $1}')"
 printf '%s\n' 'encrypted backup and repository integrity check passed.'

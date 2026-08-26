@@ -25,6 +25,9 @@ grep -Fq 'off-host backups must use a remote restic repository form' \
 grep -Fq 'hermes-state-metadata' "$repo_root/scripts/backup-hermes-state.sh"
 grep -Fq 'hermes-state-data' "$repo_root/scripts/restore-hermes-state.sh"
 grep -Fq 'restic metadata snapshot is missing' "$repo_root/scripts/validate-backup.sh"
+grep -Fq -- '--json' "$repo_root/scripts/backup-hermes-state.sh"
+grep -Fq 'source_bytes_processed=' "$repo_root/scripts/backup-hermes-state.sh"
+grep -Fq 'stored_bytes_added=' "$repo_root/scripts/backup-hermes-state.sh"
 grep -Fq 'backup password file must be root-owned with mode 0600' \
     "$repo_root/scripts/lib/hermes-backup.sh"
 grep -Fq 'backup password file must not be under HERMES_HOME' \

@@ -165,6 +165,14 @@ backup_restic() {
         "$RESTIC_BIN" "$@"
 }
 
+backup_json_number() {
+    local key=$1
+    local json_file=$2
+
+    sed -nE "s/.*\"$key\"[[:space:]]*:[[:space:]]*([0-9]+).*/\1/p" "$json_file" \
+        | tail -n 1
+}
+
 backup_append_path() {
     local manifest_file=$1
     local path=$2
