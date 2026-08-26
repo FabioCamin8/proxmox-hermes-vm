@@ -24,8 +24,8 @@ storage plugins.
   before import.
 - Hermes Agent 0.20.5 from the pinned official source commit
   `1bbb6e5bce56e721ab685af4cd87df21bbff4d35`.
-- Python 3.11.16, Node.js 24.20.0, npm 11.19.0, ripgrep 14.1.1, ffmpeg
-  7.1.5, and cua-driver 0.22.1.
+- Python 3.11.16, Node.js v26.7.0, ripgrep 14.1.1, ffmpeg 7.1.5, and
+  cua-driver 0.22.0.
 - Debian Chromium 151.0.7922.169 and Playwright browser dependencies.
 
 The runtime was validated after a controlled guest reboot. The aggregate
