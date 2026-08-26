@@ -382,6 +382,7 @@ file_sha256() {
 }
 
 managed_marker_is_trusted() {
+    local metadata
     file_is_root_owned_regular "$managed_marker" || return 1
     metadata=$(stat -c '%a' "$managed_marker") || return 1
     [[ "$metadata" == 600 ]] || return 1
