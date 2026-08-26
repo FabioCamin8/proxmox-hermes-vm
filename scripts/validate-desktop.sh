@@ -19,7 +19,6 @@ CDP_PORT=${CDP_PORT:-9222}
 for command_name in dpkg-query loginctl pgrep tr awk curl ss wmctrl systemctl; do
     command -v "$command_name" >/dev/null 2>&1 || die "required command is unavailable: $command_name"
 done
-sudo -n true || die 'passwordless sudo is required for system checks'
 
 packages=(qemu-guest-agent xorg xfce4 lightdm lightdm-gtk-greeter dbus-x11 at-spi2-core x11-utils x11-xserver-utils wmctrl chromium)
 for package in "${packages[@]}"; do
@@ -27,21 +26,21 @@ for package in "${packages[@]}"; do
     [[ "$status" == 'install ok installed' ]] || die "package is not installed: $package ($status)"
 done
 
-sudo -n systemctl is-active --quiet qemu-guest-agent || die 'qemu-guest-agent is not active'
-sudo -n systemctl is-active --quiet lightdm || die 'lightdm is not active'
-[[ "$(sudo -n systemctl get-default)" == graphical.target ]] || die 'graphical.target is not the default target'
+systemctl is-active --quiet qemu-guest-agent || die 'qemu-guest-agent is not active'
+systemctl is-active --quiet lightdm || die 'lightdm is not active'
+[[ "$(systemctl get-default)" == graphical.target ]] || die 'graphical.target is not the default target'
 
-failed_units=$(sudo -n systemctl --failed --no-legend)
+failed_units=$(systemctl --failed --no-legend)
 [[ -z "$failed_units" ]] || die "systemd has failed units: $failed_units"
 
 session_id=
 user_uid=$(id -u)
 while read -r candidate; do
     [[ -n "$candidate" ]] || continue
-    candidate_user=$(sudo -n loginctl show-session "$candidate" -p Name --value)
-    candidate_uid=$(sudo -n loginctl show-session "$candidate" -p User --value)
-    candidate_type=$(sudo -n loginctl show-session "$candidate" -p Type --value)
-    candidate_active=$(sudo -n loginctl show-session "$candidate" -p Active --value)
+    candidate_user=$(loginctl show-session "$candidate" -p Name --value)
+    candidate_uid=$(loginctl show-session "$candidate" -p User --value)
+    candidate_type=$(loginctl show-session "$candidate" -p Type --value)
+    candidate_active=$(loginctl show-session "$candidate" -p Active --value)
     if [[ "$candidate_user" == "$HERMES_USER" && "$candidate_uid" == "$user_uid" && "$candidate_type" == x11 && "$candidate_active" == yes ]]; then
         session_id=$candidate
         break
@@ -49,14 +48,14 @@ while read -r candidate; do
 done < <(loginctl list-sessions --no-legend | awk '{print $1}')
 [[ -n "$session_id" ]] || die "no active local X11 session found for $HERMES_USER"
 
-session_user=$(sudo -n loginctl show-session "$session_id" -p Name --value)
-session_type=$(sudo -n loginctl show-session "$session_id" -p Type --value)
-session_class=$(sudo -n loginctl show-session "$session_id" -p Class --value)
-session_remote=$(sudo -n loginctl show-session "$session_id" -p Remote --value)
-session_state=$(sudo -n loginctl show-session "$session_id" -p State --value)
-session_active=$(sudo -n loginctl show-session "$session_id" -p Active --value)
-session_display=$(sudo -n loginctl show-session "$session_id" -p Display --value)
-session_desktop=$(sudo -n loginctl show-session "$session_id" -p Desktop --value)
+session_user=$(loginctl show-session "$session_id" -p Name --value)
+session_type=$(loginctl show-session "$session_id" -p Type --value)
+session_class=$(loginctl show-session "$session_id" -p Class --value)
+session_remote=$(loginctl show-session "$session_id" -p Remote --value)
+session_state=$(loginctl show-session "$session_id" -p State --value)
+session_active=$(loginctl show-session "$session_id" -p Active --value)
+session_display=$(loginctl show-session "$session_id" -p Display --value)
+session_desktop=$(loginctl show-session "$session_id" -p Desktop --value)
 [[ "$session_user" == "$HERMES_USER" ]] || die 'session user mismatch'
 [[ "$session_type" == x11 ]] || die "session type is not x11: $session_type"
 [[ "$session_class" == user ]] || die "session class is not user: $session_class"
@@ -97,7 +96,7 @@ printf '%s\n' \
     "DBUS_SESSION_BUS_ADDRESS=$dbus_address"
 
 if [[ "$REQUIRE_AUTOLOGIN" == true ]]; then
-    sudo -n grep -qx "autologin-user=$HERMES_USER" /etc/lightdm/lightdm.conf.d/50-hermes-session.conf \
+    grep -qx "autologin-user=$HERMES_USER" /etc/lightdm/lightdm.conf.d/50-hermes-session.conf \
         || die 'LightDM autologin is not configured for the requested user'
 fi
 
@@ -140,7 +139,7 @@ grep -Fq -- '--no-default-browser-check' <<<"$browser_cmdline" \
 
 cdp_json=$(curl --fail --silent --show-error "http://$CDP_ADDRESS:$CDP_PORT/json/version")
 grep -q 'webSocketDebuggerUrl' <<<"$cdp_json" || die 'CDP response is incomplete'
-listeners=$(sudo -n ss -H -ltn "sport = :$CDP_PORT")
+listeners=$(ss -H -ltn "sport = :$CDP_PORT")
 grep -Eq "127\\.0\\.0\\.1:$CDP_PORT" <<<"$listeners" || die 'CDP is not listening on IPv4 loopback'
 ! grep -Eq "(^|[[:space:]])(0\\.0\\.0\\.0|\\*|\\[::\\]|::):$CDP_PORT([[:space:]]|$)" <<<"$listeners" \
     || die 'CDP is listening beyond loopback'

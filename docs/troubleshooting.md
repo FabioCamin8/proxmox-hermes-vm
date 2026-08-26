@@ -50,6 +50,25 @@ Keep a working session, verify `sudo -n`, validate with `sshd -t`, reload
 rather than reboot solely for SSH, and test a second session before closing
 the original one.
 
+## Hardening firewall recovery
+
+The staged firewall operation saves the prior nftables ruleset under `/run`,
+loads the candidate only after `nft -c`, and schedules a short-lived systemd
+rollback unit. Keep the original operator session and Proxmox console path
+available. If a fresh operator SSH connection fails, wait for the rollback or
+use the open recovery path; do not cancel the timer. Only the `finalize` stage
+persists `/etc/nftables.conf` and cancels the timer after a fresh connection is
+proven.
+
+The network stage refuses to flush or replace an unmanaged ruleset, and it
+does not merge arbitrary policies. On an already-hardened guest, use the
+explicit `adopt` stage after reviewing the generated-policy match; adoption
+records ownership without reapplying nftables.
+
+If LLMNR is disabled but DNS fails, inspect `resolvectl status` and the
+managed drop-in under `/etc/systemd/resolved.conf.d/`. The policy changes only
+LLMNR; it does not replace DHCP DNS settings.
+
 ## MTU mismatch
 
 Inspect the bridge, tap, virtual NIC, and guest interface. Do not force jumbo

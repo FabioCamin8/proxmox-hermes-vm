@@ -29,6 +29,40 @@ PermitRootLogin no
 Never disable the only administrative path before the key and privilege checks
 pass.
 
+## Runtime privilege boundary
+
+The runtime and operator paths are intentionally separate:
+
+```text
+Proxmox administrator -> operator Unix account -> sudo -> root
+Hermes Agent -> unprivileged hermes -X-> sudo/root
+```
+
+Hermes has terminal access by design. If that same account has
+`NOPASSWD: ALL`, it can unattendedly become root, so removing only a visible
+menu option or only the direct sudo rule is insufficient. The staged
+`scripts/harden-guest.sh` path removes the direct Hermes sudo entries and its
+`sudo` group membership, while a managed sudoers file gives administrative
+access only to the separately authenticated operator account.
+
+## Guest network boundary
+
+The optional nftables policy is opt-in and intended for a dedicated guest. It
+requires an operator-supplied SSH source range. It accepts loopback,
+established/related traffic, DHCP replies, required ICMP/ICMPv6, and explicitly
+scoped SSH; input and forwarding default to drop and output remains accept by
+design. The policy contains no Hermes Gateway or CDP ingress rule. CDP still
+relies on loopback binding in addition to this firewall policy.
+
+The repository does not merge with arbitrary existing nftables policies. It
+refuses to take ownership when unmanaged or ambiguous rules are detected and
+will not overwrite `/etc/nftables.conf` unless the file is empty/absent for a
+clean transition or is already repository-managed. An existing loaded policy
+must use the explicit adoption stage, which records a root-owned marker only
+after the live rules and persistent configuration match the generated policy.
+The live policy is syntax-checked and protected by a short-lived rollback unit
+before it is persisted.
+
 ## Repository hygiene
 
 Environment files, private/public key files, VM images, tokens, credentials,
