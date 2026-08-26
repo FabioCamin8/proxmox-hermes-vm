@@ -216,6 +216,60 @@ sshd drop-in was syntax-checked, SSH was reloaded, a second key session
 succeeded, and root key login was rejected. The effective settings were
 pubkey enabled, password disabled, and root login disabled.
 
+## Least-privilege runtime hardening
+
+Status: VERIFIED
+
+Finding: a separate local operator account was created with public-key SSH,
+locked password state, and administrative non-interactive sudo. A fresh SSH
+connection proved the operator recovery path before Hermes privilege was
+removed. Hermes was removed from the `sudo` group and its direct sudoers rule
+was removed; `sudo -n true` then failed for Hermes while the gateway, browser,
+provider request, and graphical session remained operational.
+
+## LLMNR hardening
+
+Status: VERIFIED
+
+Finding: systemd-resolved originally advertised LLMNR and listened on port
+5355. A managed resolved drop-in disabled LLMNR without changing DHCP DNS
+behavior. Resolver status no longer showed LLMNR, the port-5355 listeners were
+gone, DNS resolution succeeded, and outbound HTTPS remained functional.
+
+## nftables guest firewall
+
+Status: VERIFIED
+
+Finding: Debian nftables was installed as the explicitly requested firewall
+dependency. The generated guest policy was syntax-checked, loaded behind a
+short-lived rollback timer, and persisted only after a second fresh operator
+SSH connection succeeded. The loaded policy permits loopback,
+established/related traffic, DHCP replies, required ICMP/ICMPv6, and SSH only
+from operator-supplied ranges; input and forwarding default to drop and output
+remains accept. No Hermes Gateway or CDP ingress exception was added.
+
+## Runtime after guest firewall
+
+Status: VERIFIED
+
+Finding: the Hermes Computer Use health report remained healthy with X11
+input and screen-capture capability, and a direct screenshot succeeded after
+the firewall was loaded. The direct browser semantic smoke still returned the
+expected example page title and heading, and CDP remained loopback-only. A
+separate pointer/key action smoke was not completed because the available
+tool action did not provide a reliable no-side-effect pointer/key operation.
+
+## Least-privilege reboot acceptance
+
+Status: VERIFIED
+
+Finding: after one controlled guest-only reboot, a fresh operator public-key
+SSH session retained administrative sudo, a fresh Hermes session retained no
+sudo access, nftables remained enabled with the expected policy, and
+systemd-resolved remained LLMNR-disabled. Hermes Gateway, Hermes 0.20.5,
+Chromium/CDP, the browser semantic smoke, and the wrapped Computer Use doctor
+remained operational.
+
 ## Not tested here
 
 Status: NOT TESTED
@@ -224,6 +278,5 @@ Status: NOT TESTED
 - image download/checksum automation;
 - storage-specific apply behavior across backends;
 - independent human visual confirmation through the Proxmox noVNC console;
-- a semantic Hermes task or authenticated browser task, because no model,
-  provider, or browser credentials were configured;
+- an authenticated browser task or a destructive Hermes task;
 - destructive rollback or migration paths.

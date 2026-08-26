@@ -144,6 +144,14 @@ falls back to host resolver/search values when those VM fields are unset.
 - local environment files, images, credentials, cookies, and key files are
   ignored and must never be committed.
 
+For a deployed runtime, apply the staged least-privilege and guest-network
+hardening in [docs/hardening.md](docs/hardening.md). The Hermes account must
+not retain unrestricted sudo: terminal access combined with passwordless
+`sudo` is unattended root access. The hardening scripts create a separate
+operator account, require a fresh operator SSH proof before removing Hermes
+privilege, optionally disable LLMNR, and apply nftables only for an explicit
+operator range.
+
 ## Validation
 
 Use `scripts/validate-pve.sh` before any future provisioning change and
