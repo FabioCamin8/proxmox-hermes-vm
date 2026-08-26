@@ -15,6 +15,8 @@ The complete path is validated against Proxmox VE 9.2.x (PVE Manager 9.2.11)
 and a fresh Debian 13 genericcloud guest. `scripts/create-vm.sh` supports both
 validated preflight and explicit `--apply` creation. The tested versions and
 the small upgrade procedure are recorded in [docs/lifecycle.md](docs/lifecycle.md).
+This is a single tested Proxmox/storage combination; cross-backend apply
+portability is not claimed.
 
 ## Architecture
 

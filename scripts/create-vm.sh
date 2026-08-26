@@ -224,7 +224,7 @@ qm create "$VMID" \
     --efidisk0 "$STORAGE:0,efitype=4m,pre-enrolled-keys=0" \
     --onboot 0
 
-qm importdisk "$VMID" "$image_file" "$STORAGE" --format qcow2 \
+qm importdisk "$VMID" "$image_file" "$STORAGE" \
     || die 'qm importdisk failed for the verified Debian image'
 mapfile -t imported_volumes < <(
     qm config "$VMID" | awk '$1 ~ /^unused[0-9]+:/ { sub(/,.*/, "", $2); print $2 }'

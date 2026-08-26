@@ -52,15 +52,10 @@ if grep -Eiq '(provider|model|api[ -]?key|authentication|auth)' "$doctor_output"
     provider_state=NOT_CONFIGURED
 fi
 if ((doctor_status != 0)); then
-    if [[ "$provider_state" != NOT_CONFIGURED ]] \
-        || grep -Eiq '(traceback|command not found|no such file|module.?not.?found|import.?error|permission denied|connection refused|failed to (start|load|import)|fatal|internal error)' "$doctor_output"; then
-        printf '%s\n' 'error: Hermes doctor reported a runtime failure' >&2
-        exit "$doctor_status"
-    fi
-    printf '%s\n' 'hermes_doctor=provider-not-configured'
-else
-    printf '%s\n' 'hermes_doctor=exit-0'
+    printf '%s\n' 'error: Hermes doctor reported a runtime failure' >&2
+    exit "$doctor_status"
 fi
+printf '%s\n' 'hermes_doctor=exit-0'
 hermes computer-use status
 printf '%s\n' 'computer_use_status=exit-0'
 

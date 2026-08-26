@@ -5,10 +5,12 @@ set -Eeuo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 create_script="$repo_root/scripts/create-vm.sh"
 runtime_script="$repo_root/scripts/validate-runtime.sh"
+hermes_script="$repo_root/scripts/validate-hermes.sh"
 config="$repo_root/config/example.env"
 
 [[ -x "$create_script" ]] || { printf '%s\n' 'create-vm.sh is not executable' >&2; exit 1; }
 [[ -x "$runtime_script" ]] || { printf '%s\n' 'validate-runtime.sh is not executable' >&2; exit 1; }
+[[ -x "$hermes_script" ]] || { printf '%s\n' 'validate-hermes.sh is not executable' >&2; exit 1; }
 
 for required_text in \
     'Usage: create-vm.sh (--dry-run|--apply) ENV_FILE' \
@@ -26,7 +28,12 @@ for required_text in \
     grep -Fq -- "$required_text" "$create_script"
 done
 
+grep -Fq 'if ((doctor_status != 0)); then' "$hermes_script"
+grep -Fq 'exit "$doctor_status"' "$hermes_script"
+! grep -Fq 'provider-not-configured' "$hermes_script"
+
 ! grep -Fq 'IMAGE_SHA256_URL' "$config"
+! grep -Fq -- '--format qcow2' "$create_script"
 ! grep -Fq 'qm destroy' "$create_script"
 ! grep -Fq 'qm stop' "$create_script"
 

@@ -2,6 +2,10 @@
 
 set -Eeuo pipefail
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib/firewall-policy.sh
+source "$script_dir/lib/firewall-policy.sh"
+
 script_name=${BASH_SOURCE[0]##*/}
 stage_arg=
 env_file=
@@ -211,12 +215,17 @@ stage_privilege() {
     require_command gpasswd
     require_command visudo
     require_command runuser
+    require_command sudo
 
     visudo -c >/dev/null
     remove_hermes_direct_sudo_rules
     gpasswd --delete "$HERMES_USER" sudo >/dev/null 2>&1 || true
     visudo -c >/dev/null
 
+    if ! hermes_sudo_policy=$(sudo -n -l -U "$HERMES_USER" 2>&1) \
+        || ! grep -Fq "User $HERMES_USER is not allowed to run sudo" <<<"$hermes_sudo_policy"; then
+        die "$HERMES_USER still has an effective sudo policy"
+    fi
     if runuser -u "$HERMES_USER" -- sudo -n true >/dev/null 2>&1; then
         die "$HERMES_USER still has non-interactive sudo access"
     fi
@@ -248,52 +257,10 @@ ensure_nftables() {
     require_command nft
 }
 
-validate_ipv4_cidr() {
-    local value=$1
-    [[ "$value" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$ ]] \
-        || die "invalid IPv4 SSH_ALLOWED_CIDR: $value"
-}
-
-validate_ipv6_cidr() {
-    local value=$1
-    [[ "$value" =~ ^[0-9A-Fa-f:]+/[0-9]{1,3}$ ]] \
-        || die "invalid IPv6 SSH_ALLOWED_IPV6_CIDR: $value"
-}
-
-append_ssh_rule() {
-    local value=$1
-    if [[ "$value" == *:* ]]; then
-        validate_ipv6_cidr "$value"
-        printf '        ip6 saddr %s tcp dport 22 ct state new accept\n' "$value"
-    else
-        validate_ipv4_cidr "$value"
-        printf '        ip saddr %s tcp dport 22 ct state new accept\n' "$value"
-    fi
-}
-
 render_firewall() {
-    [[ -n "$SSH_ALLOWED_CIDR" || -n "$SSH_ALLOWED_IPV6_CIDR" ]] \
-        || die 'firewall requires SSH_ALLOWED_CIDR or SSH_ALLOWED_IPV6_CIDR'
     require_command nft
     install -d -m 0700 "$runtime_dir"
-    {
-        printf '%s\n' 'flush ruleset' 'table inet hermes_guest {'
-        printf '%s\n' '    chain input {'
-        printf '%s\n' '        type filter hook input priority 0; policy drop;'
-        printf '%s\n' '        iifname "lo" accept'
-        printf '%s\n' '        ct state established,related accept'
-        printf '%s\n' '        ct state invalid drop'
-        printf '%s\n' '        udp sport 67 udp dport 68 accept'
-        printf '%s\n' '        icmp type { destination-unreachable, echo-request, echo-reply, time-exceeded, parameter-problem } accept'
-        printf '%s\n' '        icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, echo-request, echo-reply, nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert, nd-redirect } accept'
-        [[ -z "$SSH_ALLOWED_CIDR" ]] || append_ssh_rule "$SSH_ALLOWED_CIDR"
-        [[ -z "$SSH_ALLOWED_IPV6_CIDR" ]] || append_ssh_rule "$SSH_ALLOWED_IPV6_CIDR"
-        printf '%s\n' '    }' '    chain forward {'
-        printf '%s\n' '        type filter hook forward priority 0; policy drop;'
-        printf '%s\n' '    }' '    chain output {'
-        printf '%s\n' '        type filter hook output priority 0; policy accept;'
-        printf '%s\n' '    }' '}'
-    } >"$candidate_file"
+    render_firewall_policy "$candidate_file"
     nft -c -f "$candidate_file"
 }
 
@@ -320,7 +287,31 @@ nftables_config_is_takeover_safe() {
         return 0
     fi
     file_is_root_owned_regular "$nftables_config" || return 1
-    ! file_has_meaningful_content "$nftables_config"
+    if ! file_has_meaningful_content "$nftables_config"; then
+        return 0
+    fi
+
+    local expected_file actual_file
+    expected_file=$(mktemp)
+    actual_file=$(mktemp)
+    {
+        printf '%s\n' 'table inet filter {'
+        printf '%s\n' 'chain input {'
+        printf '%s\n' 'type filter hook input priority 0;'
+        printf '%s\n' '}'
+        printf '%s\n' 'chain forward {'
+        printf '%s\n' 'type filter hook forward priority 0;'
+        printf '%s\n' '}'
+        printf '%s\n' 'chain output {'
+        printf '%s\n' 'type filter hook output priority 0;'
+        printf '%s\n' '}'
+        printf '%s\n' '}'
+    } >"$expected_file"
+    canonicalize_firewall_file "$nftables_config" >"$actual_file"
+    local result=0
+    cmp -s "$expected_file" "$actual_file" || result=$?
+    rm -f "$expected_file" "$actual_file"
+    return "$result"
 }
 
 firewall_config_preflight() {
@@ -329,23 +320,6 @@ firewall_config_preflight() {
         && ! nftables_config_is_takeover_safe; then
         die "nft is unavailable and an existing nftables configuration is not known-safe; refusing package installation before reviewing $nftables_config"
     fi
-}
-
-canonicalize_firewall_file() {
-    local file=$1
-    awk '
-        /^[[:space:]]*flush ruleset[[:space:]]*$/ { next }
-        /^[[:space:]]*$/ { print ""; next }
-        /^[[:space:]]*#/ { next }
-        {
-            line = $0
-            sub(/^[[:space:]]*/, "", line)
-            sub(/[[:space:]]*$/, "", line)
-            gsub(/[[:space:]]+/, " ", line)
-            gsub(/priority filter/, "priority 0", line)
-            print line
-        }
-    ' "$file"
 }
 
 live_firewall_matches_candidate() {

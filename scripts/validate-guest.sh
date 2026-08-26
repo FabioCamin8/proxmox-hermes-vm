@@ -18,8 +18,15 @@ actual_hostname=$(hostname -s)
 [[ "$actual_hostname" == "$expected_hostname" ]] || die "hostname mismatch: expected $expected_hostname, got $actual_hostname"
 grep -Eq '^VERSION_ID="?13' /etc/os-release || die "guest is not Debian 13"
 
-cloud_init_status=$(cloud-init status --long)
+cloud_init_exit=0
+if cloud_init_status=$(cloud-init status --long); then
+    cloud_init_exit=0
+else
+    cloud_init_exit=$?
+fi
 printf '%s\n' "$cloud_init_status"
+((cloud_init_exit == 0 || cloud_init_exit == 2)) \
+    || die "Cloud-Init status command failed with exit $cloud_init_exit"
 grep -q '^status: done$' <<<"$cloud_init_status" || die "Cloud-Init did not report done"
 grep -q '^errors: \[\]$' <<<"$cloud_init_status" || die "Cloud-Init reported errors"
 

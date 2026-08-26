@@ -72,6 +72,12 @@ requested non-root user, and configured DHCP.
 Implication: do not assume a PVE parameter change reruns consumed guest state;
 prove it from the guest.
 
+Finding: on the first hardened validation, Debian 13's `cloud-init status
+--long` returned exit code 2 for recoverable deprecation notices even though it
+reported `status: done` and `errors: []`. After reboot it returned exit code 0.
+The guest validator accepts only these two outcomes and still requires the
+completed status and empty error list.
+
 ## DNS fallback
 
 Status: VERIFIED
@@ -274,12 +280,21 @@ systemd-resolved remained LLMNR-disabled. Hermes Gateway, Hermes 0.20.5,
 Chromium/CDP, the browser semantic smoke, and the wrapped Computer Use doctor
 remained operational.
 
+## Fresh VM and verified image path
+
+Status: VERIFIED
+
+Finding: a disposable fresh Debian 13 genericcloud VM was created through the
+repository apply path. The official image was downloaded and checked against
+the matching SHA512 manifest before import; the resulting boot-volume
+reference and Cloud-Init drive were then verified from the final Proxmox
+configuration. The current import path leaves target format selection to the
+configured storage backend instead of guessing it.
+
 ## Not tested here
 
 Status: NOT TESTED
 
-- creating a second VM from the repository scripts;
-- image download/checksum automation;
 - storage-specific apply behavior across backends;
 - independent human visual confirmation through the Proxmox noVNC console;
 - an authenticated browser task or a destructive Hermes task;

@@ -151,7 +151,11 @@ printf 'chromium_window=%s\n' "$(grep -i 'chromium' <<<"$windows" | head -n 1)"
 env_file="$home_dir/.config/hermes/graphical-session.env"
 [[ -r "$env_file" ]] || die 'graphical session environment file is missing'
 systemd_bus_address="unix:path=$runtime_dir/bus"
-manager_environment=$(env DBUS_SESSION_BUS_ADDRESS="$systemd_bus_address" systemctl --user show-environment 2>/dev/null || true)
+manager_environment=$(env \
+    HOME="$home_dir" \
+    XDG_RUNTIME_DIR="$runtime_dir" \
+    DBUS_SESSION_BUS_ADDRESS="$systemd_bus_address" \
+    systemctl --user show-environment 2>/dev/null || true)
 manager_display=$(awk -F= '$1 == "DISPLAY" { sub(/^[^=]*=/, ""); print; exit }' <<<"$manager_environment")
 manager_dbus_address=$(awk -F= '$1 == "DBUS_SESSION_BUS_ADDRESS" { sub(/^[^=]*=/, ""); print; exit }' <<<"$manager_environment")
 [[ -n "$manager_display" ]] || die 'systemd user manager did not import DISPLAY'

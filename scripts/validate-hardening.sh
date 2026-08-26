@@ -2,6 +2,10 @@
 
 set -Eeuo pipefail
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib/firewall-policy.sh
+source "$script_dir/lib/firewall-policy.sh"
+
 die() {
     printf 'error: %s\n' "$*" >&2
     exit 1
@@ -49,6 +53,7 @@ command -v getent >/dev/null 2>&1 || die 'getent is unavailable'
 command -v runuser >/dev/null 2>&1 || die 'runuser is unavailable'
 command -v visudo >/dev/null 2>&1 || die 'visudo is unavailable'
 command -v ssh-keygen >/dev/null 2>&1 || die 'ssh-keygen is unavailable'
+command -v sudo >/dev/null 2>&1 || die 'sudo is unavailable'
 
 getent passwd "$HERMES_USER" >/dev/null || die "Hermes account is missing: $HERMES_USER"
 getent passwd "$ADMIN_USER" >/dev/null || die "operator account is missing: $ADMIN_USER"
@@ -75,6 +80,10 @@ runuser -u "$ADMIN_USER" -- sudo -n true || die 'operator non-interactive sudo p
 
 if id -nG "$HERMES_USER" | tr ' ' '\n' | grep -qx sudo; then
     die 'Hermes remains in the sudo group'
+fi
+if ! hermes_sudo_policy=$(sudo -n -l -U "$HERMES_USER" 2>&1) \
+    || ! grep -Fq "User $HERMES_USER is not allowed to run sudo" <<<"$hermes_sudo_policy"; then
+    die 'Hermes has an effective sudo policy'
 fi
 if runuser -u "$HERMES_USER" -- sudo -n true >/dev/null 2>&1; then
     die 'Hermes still has non-interactive sudo access'
@@ -105,15 +114,71 @@ curl --fail --silent --show-error --max-time 15 https://example.com >/dev/null \
 if [[ "$ENABLE_FIREWALL" == true ]]; then
     command -v nft >/dev/null 2>&1 || die 'nft is unavailable while firewall validation is enabled'
     systemctl is-active --quiet nftables || die 'nftables service is not active'
-    nft -c -f /etc/nftables.conf
-    nft list table inet hermes_guest >/dev/null 2>&1 || die 'hermes nftables table is missing'
-    input_chain=$(nft list chain inet hermes_guest input)
-    grep -Eq 'policy drop' <<<"$input_chain" || die 'nftables input policy is not drop'
-    grep -Eq 'tcp dport (22|ssh)' <<<"$input_chain" || die 'nftables SSH exception is missing'
-    [[ -z "$SSH_ALLOWED_CIDR" ]] || grep -Fq "$SSH_ALLOWED_CIDR" <<<"$input_chain" \
-        || die 'configured IPv4 SSH range is missing from nftables'
-    [[ -z "$SSH_ALLOWED_IPV6_CIDR" ]] || grep -Fq "$SSH_ALLOWED_IPV6_CIDR" <<<"$input_chain" \
-        || die 'configured IPv6 SSH range is missing from nftables'
+    managed_marker=/var/lib/hermes-hardening/nftables-managed
+    nftables_config=/etc/nftables.conf
+    file_is_root_owned_regular() {
+        local file=$1
+        [[ -f "$file" && ! -L "$file" ]] || return 1
+        [[ "$(stat -c '%u:%g' "$file")" == 0:0 ]]
+    }
+    managed_marker_is_trusted() {
+        file_is_root_owned_regular "$managed_marker" || return 1
+        [[ "$(stat -c '%a' "$managed_marker")" == 600 ]] || return 1
+        [[ "$(sed -n '1p' "$managed_marker")" == version=1 ]] || return 1
+        [[ "$(wc -l <"$managed_marker")" == 4 ]]
+    }
+    file_sha256() {
+        local digest
+        read -r digest _ < <(sha256sum -- "$1")
+        printf '%s\n' "$digest"
+    }
+    compare_canonical_firewall_files() {
+        local expected_file actual_file
+        expected_file=$(mktemp)
+        actual_file=$(mktemp)
+        if ! canonicalize_firewall_file "$1" >"$expected_file" \
+            || ! canonicalize_firewall_file "$2" >"$actual_file"; then
+            rm -f "$expected_file" "$actual_file"
+            return 1
+        fi
+        local result=0
+        cmp -s "$expected_file" "$actual_file" || result=$?
+        rm -f "$expected_file" "$actual_file"
+        return "$result"
+    }
+
+    managed_marker_is_trusted \
+        || die 'repository-managed nftables ownership marker is missing or unsafe'
+    file_is_root_owned_regular "$nftables_config" \
+        || die 'nftables configuration is not a root-owned regular file'
+    firewall_candidate=$(mktemp)
+    firewall_live=$(mktemp)
+    trap 'rm -f -- "${firewall_candidate:-}" "${firewall_live:-}"' EXIT
+    render_firewall_policy "$firewall_candidate"
+    nft -c -f "$nftables_config"
+    nft -c -f "$firewall_candidate"
+    nft list ruleset >"$firewall_live" \
+        || die 'unable to inspect the live nftables ruleset'
+    compare_canonical_firewall_files "$firewall_candidate" "$nftables_config" \
+        || die 'persistent nftables configuration is not exactly the repository policy'
+    compare_canonical_firewall_files "$firewall_candidate" "$firewall_live" \
+        || die 'live nftables ruleset is not exactly the repository policy'
+
+    marker_candidate=$(sed -n '2p' "$managed_marker")
+    marker_config=$(sed -n '3p' "$managed_marker")
+    marker_live=$(sed -n '4p' "$managed_marker")
+    [[ "$marker_candidate" =~ ^candidate_sha256=[[:xdigit:]]{64}$ ]] \
+        || die 'managed nftables marker has an invalid candidate digest'
+    [[ "$marker_config" =~ ^config_sha256=[[:xdigit:]]{64}$ ]] \
+        || die 'managed nftables marker has an invalid config digest'
+    [[ "$marker_live" =~ ^live_sha256=[[:xdigit:]]{64}$ ]] \
+        || die 'managed nftables marker has an invalid live digest'
+    [[ "${marker_candidate#candidate_sha256=}" == "$(file_sha256 "$firewall_candidate")" ]] \
+        || die 'managed nftables marker does not identify the repository candidate'
+    [[ "${marker_config#config_sha256=}" == "$(file_sha256 "$nftables_config")" ]] \
+        || die 'managed nftables marker does not identify the current configuration'
+    [[ "${marker_live#live_sha256=}" == "$(file_sha256 "$firewall_live")" ]] \
+        || die 'managed nftables marker does not identify the current live ruleset'
 else
     printf '%s\n' 'firewall check: disabled by explicit configuration'
 fi

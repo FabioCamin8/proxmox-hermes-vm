@@ -66,10 +66,10 @@ The current validated snapshot was Hermes `0.20.5`, source commit
 permanent public version pins.
 
 `hermes doctor` may report a provider/model/auth setup requirement on a fresh
-install. The validator records that condition as `provider=NOT_CONFIGURED` but
-still fails for missing executables, broken source/virtualenv state, or other
-runtime diagnostics. The task deliberately did not run `hermes doctor --fix`
-or configure any provider.
+install. The validator records that condition as `provider=NOT_CONFIGURED` only
+when the doctor command itself exits successfully; any nonzero doctor exit is a
+runtime failure, including when provider-setup wording is also present. The
+task deliberately did not run `hermes doctor --fix` or configure any provider.
 
 `hermes computer-use doctor` is the current Computer Use diagnostic. In the
 validated X11 session it exited zero and reported a live cua-driver MCP

@@ -6,22 +6,31 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 harden_script="$repo_root/scripts/harden-guest.sh"
 validate_script="$repo_root/scripts/validate-hardening.sh"
 example_env="$repo_root/config/hardening.example.env"
+firewall_policy="$repo_root/scripts/lib/firewall-policy.sh"
 
 [[ -x "$harden_script" ]] || { printf '%s\n' 'hardening script is not executable' >&2; exit 1; }
 [[ -x "$validate_script" ]] || { printf '%s\n' 'hardening validator is not executable' >&2; exit 1; }
+[[ -r "$firewall_policy" ]] || { printf '%s\n' 'shared firewall policy is missing' >&2; exit 1; }
+grep -Fq 'render_firewall_policy' "$firewall_policy"
+grep -Fq 'canonicalize_firewall_file' "$firewall_policy"
 
 grep -Fxq 'ENABLE_FIREWALL=false' "$example_env"
 grep -Fxq 'ENABLE_LLMNR=false' "$example_env"
 grep -Fq 'ADMIN_SSH_PUBLIC_KEY_FILE' "$harden_script"
 grep -Fq 'sudo -n true' "$harden_script"
+grep -Fq 'sudo -n -l -U "$HERMES_USER"' "$harden_script"
 grep -Fq 'nft -c -f' "$harden_script"
 grep -Fq 'systemd-run --unit="$rollback_unit"' "$harden_script"
 grep -Fq 'LLMNR=no' "$harden_script"
 grep -Fq 'permitrootlogin no' "$validate_script"
 grep -Fq 'hermes-gateway.service' "$validate_script"
+grep -Fq 'sudo -n -l -U "$HERMES_USER"' "$validate_script"
+grep -Fq 'repository-managed nftables ownership marker' "$validate_script"
+grep -Fq 'compare_canonical_firewall_files' "$validate_script"
+grep -Fq 'nft list ruleset' "$validate_script"
 ! grep -Fq 'RUN_RUNTIME_SMOKE' "$validate_script"
 
-grep -Fq 'SSH_ALLOWED_CIDR or SSH_ALLOWED_IPV6_CIDR' "$harden_script"
+grep -Fq 'SSH_ALLOWED_CIDR or SSH_ALLOWED_IPV6_CIDR' "$firewall_policy"
 grep -Fq 'stage_adopt' "$harden_script"
 grep -Fq 'unmanaged or ambiguous nftables rules are loaded' "$harden_script"
 grep -Fq 'live_firewall_matches_candidate' "$harden_script"
@@ -110,6 +119,29 @@ fi
 ! grep -Fq 'nft -f ' "$unmanaged_config_case/actions"
 ! grep -Fq 'systemd-run ' "$unmanaged_config_case/actions"
 
+default_config_case="$fixture_root/default-config"
+mkdir -p "$default_config_case"
+: >"$default_config_case/ruleset"
+cat >"$default_config_case/nftables.conf" <<'EOF'
+#!/usr/sbin/nft -f
+flush ruleset
+table inet filter {
+    chain input {
+        type filter hook input priority filter;
+    }
+    chain forward {
+        type filter hook forward priority filter;
+    }
+    chain output {
+        type filter hook output priority filter;
+    }
+}
+EOF
+: >"$default_config_case/actions"
+run_network_fixture "$default_config_case" "$default_config_case/output"
+grep -Fq 'nft -f ' "$default_config_case/actions"
+grep -Fq 'firewall live policy applied' "$default_config_case/output"
+
 finalize_case="$fixture_root/finalize"
 mkdir -p "$finalize_case"
 : >"$finalize_case/ruleset"
@@ -141,7 +173,8 @@ mkdir -p "$managed_case"
 run_network_fixture "$managed_case" "$managed_case/clean-output"
 grep -Fq 'nft -f ' "$managed_case/actions"
 cp "$managed_case/runtime/nftables.candidate" "$managed_case/nftables.conf"
-sed '/^[[:space:]]*flush ruleset[[:space:]]*$/d' \
+sed -e '/^[[:space:]]*flush ruleset[[:space:]]*$/d' \
+    -e 's/icmp type { destination-unreachable, echo-request, echo-reply, time-exceeded, parameter-problem }/icmp type { echo-reply, destination-unreachable, echo-request, time-exceeded, parameter-problem }/' \
     "$managed_case/runtime/nftables.candidate" >"$managed_case/ruleset"
 : >"$managed_case/actions"
 PATH="$mock_bin:$PATH" \
