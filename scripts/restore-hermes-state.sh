@@ -49,6 +49,7 @@ backup_load_env "$env_file"
 backup_set_defaults
 
 backup_validate_restore_target "$target"
+backup_require_unprivileged_runtime_identity
 
 backup_validate_runtime_options
 backup_require_root
@@ -99,6 +100,7 @@ backup_restic restore "$snapshot_id" --target "$target" --verify \
     || backup_die 'encrypted restore failed; no sensitive command output is displayed'
 rm -f -- "$target/.restic-restore.log"
 
+backup_normalize_restored_runtime_ownership "$target"
 backup_validate_restored_tree "$target"
 printf 'restored_snapshot=%s\n' "$snapshot_id"
 printf '%s\n' 'isolated restore completed; plaintext restore tree was removed.'

@@ -160,9 +160,9 @@ upgrade separately after a same-version recovery works.
 5. Stop/quiesce the fresh Hermes runtime and browser.
 6. Restore persistent state into the intended new guest paths only after the
    isolated restore validation passes.
-7. Reapply `hermes:hermes` ownership and restrictive permissions if the target
-   system maps user IDs differently; never make sensitive files group/world
-   readable.
+7. The isolated restore normalizes the restored tree to the target system's
+   unprivileged `hermes:hermes` identity before validating ownership. Never
+   make sensitive files group/world readable.
 8. Start the graphical session, Chromium, and Hermes gateway.
 9. Validate provider access, browser semantic smoke, loopback-only CDP,
    Computer Use, gateway health, and failed systemd units.

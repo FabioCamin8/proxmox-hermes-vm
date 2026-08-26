@@ -51,13 +51,22 @@ backup_require_integer() {
     [[ "$value" =~ ^[0-9]+$ ]] || backup_die "$name must be an integer"
 }
 
-backup_require_runtime_identity() {
+backup_require_unprivileged_runtime_identity() {
     local actual_home
+    local actual_uid
 
     getent passwd "$HERMES_USER" >/dev/null || backup_die "Hermes user is missing: $HERMES_USER"
     actual_home=$(getent passwd "$HERMES_USER" | cut -d: -f6)
     [[ "$actual_home" == "$HERMES_HOME" ]] \
         || backup_die "HERMES_HOME does not match the account home: $actual_home"
+    actual_uid=$(id -u "$HERMES_USER")
+    [[ "$actual_uid" != 0 ]] \
+        || backup_die 'HERMES_USER must identify an unprivileged account'
+}
+
+backup_require_runtime_identity() {
+    backup_require_unprivileged_runtime_identity
+
     [[ -d "$HERMES_HOME/.hermes" ]] || backup_die 'Hermes state directory is missing'
     [[ "$(stat -c '%U:%G' "$HERMES_HOME/.hermes")" == "$HERMES_USER:$HERMES_USER" ]] \
         || backup_die 'Hermes state directory ownership is unexpected'
@@ -174,6 +183,16 @@ backup_validate_restore_target() {
     [[ ! -e "$target" ]] || backup_die 'restore target already exists'
     [[ -d /var/tmp && "$(stat -c '%u' /var/tmp)" == 0 ]] \
         || backup_die 'restore target parent must be root-owned'
+}
+
+backup_normalize_restored_runtime_ownership() {
+    local restore_root=$1
+    local restored_home="$restore_root$HERMES_HOME"
+
+    [[ -d "$restored_home" && ! -L "$restored_home" ]] \
+        || backup_die 'restored Hermes home is missing or symlinked'
+    chown -R --no-dereference -- "$HERMES_USER:$HERMES_USER" "$restored_home" \
+        || backup_die 'could not normalize restored Hermes ownership'
 }
 
 backup_restic() {

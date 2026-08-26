@@ -32,6 +32,12 @@ grep -Fq 'backup password file must be root-owned with mode 0600' \
     "$repo_root/scripts/lib/hermes-backup.sh"
 grep -Fq 'backup password file must not be under HERMES_HOME' \
     "$repo_root/scripts/lib/hermes-backup.sh"
+grep -Fq 'HERMES_USER must identify an unprivileged account' \
+    "$repo_root/scripts/lib/hermes-backup.sh"
+grep -Fq 'backup_normalize_restored_runtime_ownership' \
+    "$repo_root/scripts/restore-hermes-state.sh"
+grep -Fq 'chown -R --no-dereference' \
+    "$repo_root/scripts/lib/hermes-backup.sh"
 grep -Fq 'PRAGMA quick_check' "$repo_root/scripts/lib/hermes-backup.sh"
 grep -Fq 'database-wal' "$repo_root/scripts/lib/hermes-backup.sh"
 grep -Fq 'Chromium did not exit cleanly' "$repo_root/scripts/backup-hermes-state.sh"
@@ -106,6 +112,13 @@ if bash -c 'source "$1"; BACKUP_DESTINATION_KIND=off-host; BACKUP_REPOSITORY=sft
     exit 1
 fi
 grep -Fq 'backup password file must be a regular non-symlink file' "$guard_output"
+
+if bash -c 'source "$1"; HERMES_USER=root; HERMES_HOME=/root; backup_require_unprivileged_runtime_identity' _ \
+    "$repo_root/scripts/lib/hermes-backup.sh" >"$guard_output" 2>&1; then
+    printf '%s\n' 'root runtime identity guard unexpectedly passed' >&2
+    exit 1
+fi
+grep -Fq 'HERMES_USER must identify an unprivileged account' "$guard_output"
 
 mkdir -- "$existing_target"
 if bash "$repo_root/scripts/restore-hermes-state.sh" \
