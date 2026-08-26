@@ -227,6 +227,10 @@ removed. Hermes was removed from the `sudo` group and its direct sudoers rule
 was removed; `sudo -n true` then failed for Hermes while the gateway, browser,
 provider request, and graphical session remained operational.
 
+The desktop validator also runs successfully as the unprivileged Hermes
+runtime user after least-privilege hardening. Hermes requires no sudo access
+for desktop, CDP, or Computer Use validation.
+
 ## LLMNR hardening
 
 Status: VERIFIED
