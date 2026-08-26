@@ -37,8 +37,30 @@ printf 'ffmpeg=%s\n' "$(ffmpeg -version | head -n 1)"
 printf 'cua_driver=%s\n' "$(cua-driver --version | head -n 1)"
 
 hermes --help >/dev/null
-hermes doctor
-printf '%s\n' 'hermes_doctor=exit-0'
+doctor_output=$(mktemp)
+trap 'rm -f -- "$doctor_output"' EXIT
+doctor_status=0
+if hermes doctor >"$doctor_output" 2>&1; then
+    doctor_status=0
+else
+    doctor_status=$?
+fi
+cat "$doctor_output"
+provider_state=PASS
+if grep -Eiq '(provider|model|api[ -]?key|authentication|auth)' "$doctor_output" \
+    && grep -Eiq '(not configured|not set|missing|no provider|setup|sign in|authenticate)' "$doctor_output"; then
+    provider_state=NOT_CONFIGURED
+fi
+if ((doctor_status != 0)); then
+    if [[ "$provider_state" != NOT_CONFIGURED ]] \
+        || grep -Eiq '(traceback|command not found|no such file|module.?not.?found|import.?error|permission denied|connection refused|failed to (start|load|import)|fatal|internal error)' "$doctor_output"; then
+        printf '%s\n' 'error: Hermes doctor reported a runtime failure' >&2
+        exit "$doctor_status"
+    fi
+    printf '%s\n' 'hermes_doctor=provider-not-configured'
+else
+    printf '%s\n' 'hermes_doctor=exit-0'
+fi
 hermes computer-use status
 printf '%s\n' 'computer_use_status=exit-0'
 
@@ -55,4 +77,6 @@ else
     printf '%s\n' 'playwright_browser_cache=NOT_TESTED (cache is absent)'
 fi
 
-printf '%s\n' 'Hermes validation passed.'
+printf '%s\n' \
+    "provider=$provider_state" \
+    'Hermes validation passed.'

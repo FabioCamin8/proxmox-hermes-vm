@@ -65,11 +65,11 @@ The current validated snapshot was Hermes `0.20.5`, source commit
 `151.0.7922.169-1~deb13u1`. These are observations from one install, not
 permanent public version pins.
 
-`hermes doctor` exited zero in the validated guest. It still reported the
-expected unconfigured provider/auth warnings, an available config migration,
-state-database schema warnings, optional workspace dependency advisories, and
-optional browser-system-dependency warnings. The task deliberately did not run
-`hermes doctor --fix` or configure any provider.
+`hermes doctor` may report a provider/model/auth setup requirement on a fresh
+install. The validator records that condition as `provider=NOT_CONFIGURED` but
+still fails for missing executables, broken source/virtualenv state, or other
+runtime diagnostics. The task deliberately did not run `hermes doctor --fix`
+or configure any provider.
 
 `hermes computer-use doctor` is the current Computer Use diagnostic. In the
 validated X11 session it exited zero and reported a live cua-driver MCP

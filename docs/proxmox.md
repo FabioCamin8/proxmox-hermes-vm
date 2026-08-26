@@ -26,6 +26,25 @@ storage volume reference and used `virtio-scsi-single`, `discard=on`,
 
 The scripts refuse an occupied VMID and never delete or recreate a VM.
 
+## Creation
+
+Run the dry run first, review its output, then explicitly acknowledge
+Proxmox mutations with `--apply`:
+
+```bash
+scripts/create-vm.sh --dry-run config/local.env
+scripts/create-vm.sh --apply config/local.env
+```
+
+The apply path downloads the configured official Debian genericcloud image to
+the configured cache, verifies it against the matching `SHA512SUMS` entry,
+creates the VM, imports the verified image with `qm importdisk`, and obtains
+the real volume reference from the import result/`qm config`. It then attaches
+that reference as `scsi0`, resizes only after the attachment is confirmed,
+adds the Cloud-Init drive, and regenerates the seed. A failed post-create step
+leaves the newly created VM for explicit operator review; the script never
+performs broad or implicit deletion.
+
 ## Representative configuration
 
 ```text

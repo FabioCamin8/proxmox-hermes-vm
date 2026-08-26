@@ -121,12 +121,17 @@ fi
 hermes_uid=$(id -u "$HERMES_USER")
 hermes_runtime_dir=/run/user/$hermes_uid
 hermes_home=$(getent passwd "$HERMES_USER" | cut -d: -f6)
-runuser -u "$HERMES_USER" -- env \
-    HOME="$hermes_home" \
-    XDG_RUNTIME_DIR="$hermes_runtime_dir" \
-    DBUS_SESSION_BUS_ADDRESS="unix:path=$hermes_runtime_dir/bus" \
-    systemctl --user is-active --quiet hermes-gateway.service \
-    || die 'Hermes gateway is not active'
+gateway_state=NOT_CONFIGURED
+gateway_unit="$hermes_home/.config/systemd/user/hermes-gateway.service"
+if [[ -e "$gateway_unit" ]]; then
+    runuser -u "$HERMES_USER" -- env \
+        HOME="$hermes_home" \
+        XDG_RUNTIME_DIR="$hermes_runtime_dir" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=$hermes_runtime_dir/bus" \
+        systemctl --user is-active --quiet hermes-gateway.service \
+        || die 'Hermes gateway is installed but not active'
+    gateway_state=PASS
+fi
 
 cdp_listeners=$(ss -H -ltn "sport = :$CDP_PORT")
 grep -Eq "127\.0\.0\.1:$CDP_PORT" <<<"$cdp_listeners" \
@@ -141,4 +146,5 @@ printf '%s\n' \
     "operator=$ADMIN_USER" \
     "hermes=$HERMES_USER" \
     "llmnr=$([[ "$ENABLE_LLMNR" == false ]] && printf disabled || printf enabled)" \
-    "firewall=$ENABLE_FIREWALL"
+    "firewall=$ENABLE_FIREWALL" \
+    "gateway=$gateway_state"
