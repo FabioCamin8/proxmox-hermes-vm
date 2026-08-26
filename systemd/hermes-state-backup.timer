@@ -9,4 +9,3 @@ Unit=hermes-state-backup.service
 
 [Install]
 WantedBy=timers.target
-
