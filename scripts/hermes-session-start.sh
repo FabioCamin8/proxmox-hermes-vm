@@ -50,7 +50,7 @@ fi
 if command -v systemctl >/dev/null 2>&1; then
     if [[ -n "$systemd_bus_address" ]]; then
         DBUS_SESSION_BUS_ADDRESS="$systemd_bus_address" systemctl --user import-environment "${user_environment[@]}" >/dev/null 2>&1 || true
-        DBUS_SESSION_BUS_ADDRESS="$systemd_bus_address" systemctl --user set-environment "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >/dev/null 2>&1 || true
+        DBUS_SESSION_BUS_ADDRESS="$systemd_bus_address" systemctl --user set-environment "DBUS_SESSION_BUS_ADDRESS=$systemd_bus_address" >/dev/null 2>&1 || true
     else
         systemctl --user import-environment "${user_environment[@]}" >/dev/null 2>&1 || true
     fi

@@ -11,13 +11,12 @@ of the repository.
 
 ## Status
 
-The base method was validated against Proxmox VE 9.2.x (PVE Manager 9.2.11)
-and a Debian 13.6 genericcloud guest. The validation used one already-created
-VM and did not create a test VM. The repository's PVE validator and guest
-validator are usable; `scripts/create-vm.sh` currently provides a validated
-preflight and dry-run plan only. It must not be described as a from-scratch
-provisioner until its apply path has been tested on an intentionally disposable
-VM.
+The complete path is validated against Proxmox VE 9.2.x (PVE Manager 9.2.11)
+and a fresh Debian 13 genericcloud guest. `scripts/create-vm.sh` supports both
+validated preflight and explicit `--apply` creation. The tested versions and
+the small upgrade procedure are recorded in [docs/lifecycle.md](docs/lifecycle.md).
+This is a single tested Proxmox/storage combination; cross-backend apply
+portability is not claimed.
 
 ## Architecture
 
@@ -57,11 +56,13 @@ cp config/example.env config/local.env
 # Fill in VMID, STORAGE, and SSH_PUBLIC_KEY_FILE.
 ./scripts/validate-pve.sh config/local.env
 ./scripts/create-vm.sh --dry-run config/local.env
+./scripts/create-vm.sh --apply config/local.env
 ```
 
-The dry run is an intentional stop point in this initial repository. Review
-the plan and storage/image choices before implementing or enabling an apply
-path. Never delete an existing VM to make a deployment succeed.
+`--apply` is the explicit mutation acknowledgement. It verifies the official
+Debian image against its SHA512 manifest before creating a new VM, refuses an
+occupied VMID, and reports the actual imported boot volume and Cloud-Init
+drive. Never delete an existing VM to make a deployment succeed.
 
 ## Guest runtime
 
@@ -75,12 +76,13 @@ sudo env HERMES_COMMIT=<official-hermes-commit> ./scripts/bootstrap-hermes.sh
 ```
 
 The first desktop command keeps LightDM autologin disabled. Enable autologin
-only when an unattended graphical session is an explicit requirement. The
-desktop and Hermes validators are run as `hermes`:
+only when an unattended graphical session is an explicit requirement. Create
+the separate operator account, prove a fresh operator SSH session, and then
+remove Hermes' sudo access with [docs/hardening.md](docs/hardening.md). The
+final aggregate validator is run from that fresh `ops` session:
 
 ```bash
-HERMES_USER=hermes REQUIRE_AUTOLOGIN=true ./scripts/validate-desktop.sh
-./scripts/validate-hermes.sh
+./scripts/validate-runtime.sh --env /path/to/private-hardening.env
 ```
 
 See [docs/desktop.md](docs/desktop.md), [docs/browser.md](docs/browser.md),
@@ -95,7 +97,7 @@ Important variables are documented in `config/example.env`:
 - `MTU`, which defaults to the safe public value `1500`;
 - `CPU_TYPE`, `CORES`, `MEMORY_MB`, `DISK_SIZE_GB`, `MACHINE`, and `BIOS`;
 - `CI_USER`, `SSH_PUBLIC_KEY_FILE`, `IPCONFIG0`, and `CIUPGRADE`;
-- explicit Debian image URL/checksum source and cache location.
+- explicit Debian image URL/SHA512 checksum source and cache location.
 
 Jumbo frames are opt-in. Set a larger MTU only when the complete path—from
 guest through virtual NIC, bridge, physical NIC, switch, and router—supports
@@ -154,8 +156,9 @@ operator range.
 
 ## Validation
 
-Use `scripts/validate-pve.sh` before any future provisioning change and
-`scripts/validate-guest.sh` after boot. The acceptance proof should include:
+Use `scripts/validate-pve.sh` before provisioning and
+`scripts/validate-runtime.sh` after the guest has been bootstrapped and
+hardened. The aggregate acceptance proof includes:
 
 - unambiguous VM identity and a preserved pre-change configuration snapshot;
 - Debian 13, expected hostname, non-root key SSH, and usable sudo;
@@ -163,7 +166,9 @@ Use `scripts/validate-pve.sh` before any future provisioning change and
 - DHCP address/default route and actual guest MTU;
 - effective SSH settings and no failed systemd units;
 - QEMU Guest Agent status, distinguishing the Proxmox option from the guest
-  package/service.
+  package/service;
+- XFCE/X11, AT-SPI, Chromium, loopback-only CDP, Hermes, and Computer Use;
+- `ops` administrative access and no Hermes sudo access.
 
 ## Known quirks
 
@@ -188,13 +193,13 @@ Chromium session. The runtime scripts do not modify the base Cloud-Init
 document, do not install Docker or standalone VNC, and do not configure
 provider credentials. The visible browser's CDP endpoint is loopback-only.
 
-## Limitations
+## Operator boundary
 
-This repository still does not implement or validate the apply path for
-creating a new VM from scratch. Image URLs and checksums must be reviewed at
-deployment time. Storage behavior, MTU, guest-agent packaging, and graphical
-dependencies remain environment-specific. A semantic Hermes task and
-provider authentication remain manual steps.
+The template produces an operator-ready Hermes runtime, not a configured
+Hermes account. Provider credentials, model selection, API keys, auth state,
+messaging, browser logins, and personal workflows remain operator actions.
+The pristine template validator reports provider and gateway state as
+`NOT_CONFIGURED` when setup has intentionally not been performed.
 
 ## License
 

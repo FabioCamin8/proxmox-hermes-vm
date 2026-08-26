@@ -42,8 +42,9 @@ Hermes has terminal access by design. If that same account has
 `NOPASSWD: ALL`, it can unattendedly become root, so removing only a visible
 menu option or only the direct sudo rule is insufficient. The staged
 `scripts/harden-guest.sh` path removes the direct Hermes sudo entries and its
-`sudo` group membership, while a managed sudoers file gives administrative
-access only to the separately authenticated operator account.
+`sudo` group membership, proves the effective sudo policy denies Hermes, and
+keeps a managed sudoers file that gives administrative access only to the
+separately authenticated operator account.
 
 ## Guest network boundary
 

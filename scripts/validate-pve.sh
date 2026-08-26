@@ -25,7 +25,7 @@ pveversion -v | grep -E '^(pve-manager|qemu-server|pve-qemu-kvm|proxmox-ve):' ||
 qm help set >/dev/null 2>&1 || die "qm set is unavailable"
 qm help cloudinit >/dev/null 2>&1 || die "qm cloudinit is unavailable"
 
-pvesm status | awk -v storage="$STORAGE" '
+pvesm status --storage "$STORAGE" --content images | awk -v storage="$STORAGE" '
     $1 == storage && $3 == "active" { found = 1 }
     END { exit !found }
 ' || die "storage is not active or does not exist: $STORAGE"

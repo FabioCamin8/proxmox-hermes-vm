@@ -45,9 +45,12 @@ The optional firewall is intended for a dedicated guest whose complete
 nftables policy can be owned by this repository. The repository does not merge
 with arbitrary existing firewall policies. Before applying or persisting a
 policy, the script requires either a clean ruleset and an empty or absent
-configuration file, or a root-owned managed-state marker whose hashes and
-contents still match the repository policy. Unmanaged or ambiguous rules are
-refused, and `/etc/nftables.conf` is not overwritten in that case.
+configuration file, the exact stock Debian empty `inet filter` configuration,
+or a root-owned managed-state marker whose hashes and contents still match the
+repository policy. Unmanaged or ambiguous rules are refused, and
+`/etc/nftables.conf` is not overwritten in that case. The stock configuration
+is takeover-safe only when the live ruleset is empty; a loaded table still
+requires the managed-state proof or explicit adoption.
 
 Do not enable the firewall blindly on an already-managed system. For the
 already-hardened guest, first render and prove the live ruleset and persistent
@@ -115,9 +118,12 @@ configuration is refused.
 ## Validation
 
 `scripts/validate-hardening.sh` is read-only. It checks the operator account,
-key file shape and permissions, managed sudo policy, Hermes' failed sudo path,
-effective SSH policy, LLMNR/DNS, optional nftables persistence, gateway
-activity, and loopback CDP. Run provider and graphical smoke tests from the
+key file shape and permissions, managed sudo policy, Hermes' effective sudo
+denial and failed sudo path, effective SSH policy, LLMNR/DNS, optional
+nftables ownership and exact policy persistence, gateway activity when a
+gateway has been configured, and loopback CDP. A pristine
+official Hermes install reports `gateway=NOT_CONFIGURED`; an installed but
+inactive gateway remains a validation failure. Run provider and graphical smoke tests from the
 actual Hermes SSH session, where the captured XFCE environment is available:
 
 ```text
