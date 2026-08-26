@@ -68,7 +68,7 @@ credential that decrypts its own backups.
 Copy `config/backup.example.env` to a root-controlled deployment path and fill
 only the approved destination and password-file path. Set
 `BACKUP_DESTINATION_KIND=off-host` only after confirming that the repository
-leaves VM 105 and the physical Proxmox host. Local ZFS, local directories,
+leaves the guest and the physical Proxmox host. Local ZFS, local directories,
 same-node PBS, and VM snapshots do not qualify.
 
 ## Consistency strategy
