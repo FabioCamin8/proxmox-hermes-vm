@@ -159,6 +159,23 @@ backup_require_secure_password_file() {
         || backup_die 'backup password file must not be under HERMES_HOME'
 }
 
+backup_validate_restore_target() {
+    local target=$1
+
+    [[ "$target" == /* ]] || backup_die '--target must be absolute'
+    [[ "$target" == /var/tmp/hermes-restore-test-* ]] \
+        || backup_die '--target must match /var/tmp/hermes-restore-test-*'
+    [[ "$(dirname -- "$target")" == /var/tmp ]] \
+        || backup_die 'restore target must be a direct /var/tmp child'
+    [[ "$target" != /var/tmp/hermes-restore-test- ]] \
+        || backup_die 'restore target must have a unique suffix'
+    [[ "$target" != "$HERMES_HOME" && "$target" != "$HERMES_HOME"/* ]] \
+        || backup_die 'refusing to restore over or below HERMES_HOME'
+    [[ ! -e "$target" ]] || backup_die 'restore target already exists'
+    [[ -d /var/tmp && "$(stat -c '%u' /var/tmp)" == 0 ]] \
+        || backup_die 'restore target parent must be root-owned'
+}
+
 backup_restic() {
     RESTIC_REPOSITORY="$BACKUP_REPOSITORY" \
         RESTIC_PASSWORD_FILE="$BACKUP_PASSWORD_FILE" \

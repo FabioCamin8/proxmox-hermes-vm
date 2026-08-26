@@ -53,10 +53,16 @@ command -v "$RESTIC_BIN" >/dev/null 2>&1 || backup_die "restic command is unavai
 if ! backup_restic check >/dev/null 2>&1; then
     backup_die 'restic repository integrity check failed; no sensitive command output is displayed'
 fi
-if ! backup_restic snapshots --tag hermes-state-data --latest 1 >/dev/null 2>&1; then
+data_snapshots=$(backup_restic snapshots --tag hermes-state-data --latest 1 --json 2>/dev/null) \
+    || backup_die 'restic data snapshot is missing; no sensitive command output is displayed'
+data_snapshot_id=$(awk -F'"' '/"id"[[:space:]]*:/ { print $4; exit }' <<<"$data_snapshots")
+if [[ -z "$data_snapshot_id" ]]; then
     backup_die 'restic data snapshot is missing; no sensitive command output is displayed'
 fi
-if ! backup_restic snapshots --tag hermes-state-metadata --latest 1 >/dev/null 2>&1; then
+metadata_snapshots=$(backup_restic snapshots --tag hermes-state-metadata --latest 1 --json 2>/dev/null) \
+    || backup_die 'restic metadata snapshot is missing; no sensitive command output is displayed'
+metadata_snapshot_id=$(awk -F'"' '/"id"[[:space:]]*:/ { print $4; exit }' <<<"$metadata_snapshots")
+if [[ -z "$metadata_snapshot_id" ]]; then
     backup_die 'restic metadata snapshot is missing; no sensitive command output is displayed'
 fi
 printf '%s\n' 'restic repository integrity check passed.'

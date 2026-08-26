@@ -48,12 +48,7 @@ done
 backup_load_env "$env_file"
 backup_set_defaults
 
-[[ "$target" == /* ]] || backup_die '--target must be absolute'
-[[ "$target" == /var/tmp/hermes-restore-test-* ]] \
-    || backup_die '--target must match /var/tmp/hermes-restore-test-*'
-[[ "$target" != "$HERMES_HOME" && "$target" != "$HERMES_HOME"/* ]] \
-    || backup_die 'refusing to restore over or below HERMES_HOME'
-[[ ! -e "$target" ]] || backup_die 'restore target already exists'
+backup_validate_restore_target "$target"
 
 backup_validate_runtime_options
 backup_require_root
@@ -62,10 +57,6 @@ backup_require_off_host_destination
 backup_require_secure_password_file
 command -v "$RESTIC_BIN" >/dev/null 2>&1 || backup_die "restic command is unavailable: $RESTIC_BIN"
 [[ -x /usr/bin/python3 ]] || backup_die '/usr/bin/python3 is required for SQLite checks'
-
-target_parent=$(dirname -- "$target")
-[[ -d "$target_parent" ]] || backup_die 'restore target parent does not exist'
-[[ "$(stat -c '%u' "$target_parent")" == 0 ]] || backup_die 'restore target parent must be root-owned'
 
 mkdir -- "$target"
 chmod 700 "$target"

@@ -31,6 +31,27 @@ The Chromium profile contains cookies and other authentication material. It is
 included only because the deployment uses persistent browser state; it must
 remain encrypted and must not be launched from a restore-test tree.
 
+The live layout was reconciled against this boundary. Additional observed
+paths are intentionally excluded as follows:
+
+- Reproducible runtime: `.hermes/hermes-agent/`, its virtual environment,
+  `.hermes/node/`, `.hermes/bin/`, and `.hermes/skills/`.
+- Generated or ephemeral runtime: `.config/hermes/graphical-session.env`,
+  `.hermes/gateway_state.json`, `channel_directory.json`, gateway PID/lock/
+  socket files, startup/history/update-check files, database rebuild/dispatch
+  locks, `terminal-sessions/`, `sandboxes/`, `pending_messages/`, and
+  Chromium `Singleton*` links.
+- Cache or rebuildable data: `.hermes/image_cache/`, `audio_cache/`, `cache/`,
+  model/provider cache files, browser cache subtrees, and Playwright caches.
+- Operational logs and cron output: `.hermes/logs/`, gateway start logs, and
+  `.hermes/cron/output/`.
+
+The observed `platforms/pairing/` directory was empty; the populated Hermes
+pairing directory is included above. If a future Hermes release gives that
+directory persistent meaning, re-evaluate the manifest before relying on a
+recovery. The manifest is deliberately explicit rather than backing up all of
+`/home/hermes`.
+
 ## Tool and credential model
 
 Restic is the selected tool because it provides authenticated encryption,
