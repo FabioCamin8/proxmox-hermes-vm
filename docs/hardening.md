@@ -39,6 +39,29 @@ range.
 The default `ADMIN_USER=ops` is safe to change if that local name already
 exists. The script refuses to take over an unrelated existing account.
 
+## Firewall ownership
+
+The optional firewall is intended for a dedicated guest whose complete
+nftables policy can be owned by this repository. The repository does not merge
+with arbitrary existing firewall policies. Before applying or persisting a
+policy, the script requires either a clean ruleset and an empty or absent
+configuration file, or a root-owned managed-state marker whose hashes and
+contents still match the repository policy. Unmanaged or ambiguous rules are
+refused, and `/etc/nftables.conf` is not overwritten in that case.
+
+Do not enable the firewall blindly on an already-managed system. For the
+already-hardened guest, first render and prove the live ruleset and persistent
+configuration with the explicit adoption stage. Adoption records the managed
+state only after that proof and does not reapply nftables:
+
+```text
+sudo bash scripts/harden-guest.sh --env /path/to/private-hardening.env --stage adopt
+```
+
+If the live policy or configuration does not exactly match the generated
+repository policy, stop and review it manually; there is no automatic merge
+path.
+
 ## Staged application
 
 Run the scripts inside the guest as root, normally through the current
@@ -63,9 +86,11 @@ The network stage writes a minimal systemd-resolved drop-in with `LLMNR=no`.
 When enabled, its nftables policy allows loopback, established/related
 traffic, DHCP replies, required ICMP/ICMPv6, and SSH only from the explicit
 operator ranges. Input and forwarding default to drop; output remains accept.
-It does not add an exception for Hermes Gateway or CDP. CDP must remain bound
-to `127.0.0.1`. When the explicitly enabled firewall has no `nft` command, the
-script installs only Debian's `nftables` package before applying the policy.
+It does not add an exception for Hermes Gateway or CDP. OUTPUT remains accept
+by design, and CDP must still be bound to loopback (`127.0.0.1`); the firewall
+is not a substitute for that binding. When the explicitly enabled firewall has
+no `nft` command, the script installs only Debian's `nftables` package before
+applying the policy.
 
 The firewall is first syntax-checked and loaded only in memory. Before load,
 the current ruleset is saved and a short-lived systemd rollback unit is
@@ -81,6 +106,11 @@ sudo bash scripts/harden-guest.sh --env /path/to/private-hardening.env --stage f
 If the new connection fails, leave the rollback timer running and recover via
 the Proxmox console or the still-open operator session. Do not cancel the
 timer until a fresh SSH session has succeeded.
+
+The `finalize` stage replaces `/etc/nftables.conf` only for the clean-firewall
+transition staged by `network`, after rechecking the live policy. A previously
+managed policy may be finalized without another load; any other existing
+configuration is refused.
 
 ## Validation
 

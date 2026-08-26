@@ -47,12 +47,21 @@ access only to the separately authenticated operator account.
 
 ## Guest network boundary
 
-The optional nftables policy is opt-in and requires an operator-supplied SSH
-source range. It accepts loopback, established/related traffic, DHCP replies,
-required ICMP/ICMPv6, and explicitly scoped SSH; input and forwarding default
-to drop and output remains accept. The policy contains no Hermes Gateway or
-CDP ingress rule. The live policy is syntax-checked and protected by a
-short-lived rollback unit before it is persisted.
+The optional nftables policy is opt-in and intended for a dedicated guest. It
+requires an operator-supplied SSH source range. It accepts loopback,
+established/related traffic, DHCP replies, required ICMP/ICMPv6, and explicitly
+scoped SSH; input and forwarding default to drop and output remains accept by
+design. The policy contains no Hermes Gateway or CDP ingress rule. CDP still
+relies on loopback binding in addition to this firewall policy.
+
+The repository does not merge with arbitrary existing nftables policies. It
+refuses to take ownership when unmanaged or ambiguous rules are detected and
+will not overwrite `/etc/nftables.conf` unless the file is empty/absent for a
+clean transition or is already repository-managed. An existing loaded policy
+must use the explicit adoption stage, which records a root-owned marker only
+after the live rules and persistent configuration match the generated policy.
+The live policy is syntax-checked and protected by a short-lived rollback unit
+before it is persisted.
 
 ## Repository hygiene
 

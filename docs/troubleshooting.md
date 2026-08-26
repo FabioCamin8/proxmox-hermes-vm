@@ -48,7 +48,7 @@ captured the environment. Do not guess `DISPLAY=:0`; use the value observed by
 
 Keep a working session, verify `sudo -n`, validate with `sshd -t`, reload
 rather than reboot solely for SSH, and test a second session before closing
- the original one.
+the original one.
 
 ## Hardening firewall recovery
 
@@ -59,6 +59,11 @@ available. If a fresh operator SSH connection fails, wait for the rollback or
 use the open recovery path; do not cancel the timer. Only the `finalize` stage
 persists `/etc/nftables.conf` and cancels the timer after a fresh connection is
 proven.
+
+The network stage refuses to flush or replace an unmanaged ruleset, and it
+does not merge arbitrary policies. On an already-hardened guest, use the
+explicit `adopt` stage after reviewing the generated-policy match; adoption
+records ownership without reapplying nftables.
 
 If LLMNR is disabled but DNS fails, inspect `resolvectl status` and the
 managed drop-in under `/etc/systemd/resolved.conf.d/`. The policy changes only
