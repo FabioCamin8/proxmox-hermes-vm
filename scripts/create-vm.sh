@@ -37,13 +37,13 @@ require_account_name() {
 
 require_https_debian_image() {
     local value=$1
-    [[ "$value" =~ ^https://cloud\.debian\.org/images/cloud/[^/]+/debian-[0-9]+-genericcloud-amd64\.qcow2$ ]] \
+    [[ "$value" =~ ^https://cloud\.debian\.org/images/cloud/[^/]+/[^/]+/debian-[0-9]+-genericcloud-amd64\.qcow2$ ]] \
         || die 'IMAGE_URL must be an official Debian cloud.debian.org genericcloud amd64 qcow2 URL'
 }
 
 require_https_debian_checksum() {
     local value=$1
-    [[ "$value" =~ ^https://cloud\.debian\.org/images/cloud/[^/]+/SHA512SUMS$ ]] \
+    [[ "$value" =~ ^https://cloud\.debian\.org/images/cloud/[^/]+/[^/]+/SHA512SUMS$ ]] \
         || die 'IMAGE_CHECKSUM_URL must be the matching official Debian SHA512SUMS URL'
 }
 
@@ -224,18 +224,14 @@ qm create "$VMID" \
     --efidisk0 "$STORAGE:0,efitype=4m,pre-enrolled-keys=0" \
     --onboot 0
 
-import_output=$(qm importdisk "$VMID" "$image_file" "$STORAGE" --format qcow2 2>&1) \
+qm importdisk "$VMID" "$image_file" "$STORAGE" --format qcow2 \
     || die 'qm importdisk failed for the verified Debian image'
-imported_volume=$(awk -F': ' '$1 ~ /^unused[0-9]+$/ { print $2; exit }' <<<"$import_output")
-if [[ -z "$imported_volume" ]]; then
-    imported_volume=$(qm config "$VMID" | awk '$1 ~ /^unused[0-9]+:/ { print $2; exit }')
-fi
-[[ -n "$imported_volume" ]] \
-    || die 'qm importdisk did not expose an imported unused volume reference'
-
-post_import_config=$(qm config "$VMID")
-grep -Fq " $imported_volume" <<<"$post_import_config" \
-    || die 'the imported volume reference was not present in qm config'
+mapfile -t imported_volumes < <(
+    qm config "$VMID" | awk '$1 ~ /^unused[0-9]+:/ { sub(/,.*/, "", $2); print $2 }'
+)
+((${#imported_volumes[@]} == 1)) \
+    || die 'qm importdisk did not expose exactly one imported unused volume reference'
+imported_volume=${imported_volumes[0]}
 
 qm set "$VMID" --scsi0 "$imported_volume,discard=on,ssd=1,iothread=1"
 attached_volume=$(qm config "$VMID" | awk '$1 == "scsi0:" { sub(/,.*/, "", $2); print $2; exit }')
