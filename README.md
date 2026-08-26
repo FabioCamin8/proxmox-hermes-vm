@@ -167,6 +167,8 @@ hardened. The aggregate acceptance proof includes:
 - effective SSH settings and no failed systemd units;
 - QEMU Guest Agent status, distinguishing the Proxmox option from the guest
   package/service;
+- effective administrator audit with no unexpected sudo-capable non-system
+  accounts;
 - XFCE/X11, AT-SPI, Chromium, loopback-only CDP, Hermes, and Computer Use;
 - `ops` administrative access and no Hermes sudo access.
 

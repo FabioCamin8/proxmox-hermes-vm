@@ -55,6 +55,14 @@ command -v visudo >/dev/null 2>&1 || die 'visudo is unavailable'
 command -v ssh-keygen >/dev/null 2>&1 || die 'ssh-keygen is unavailable'
 command -v sudo >/dev/null 2>&1 || die 'sudo is unavailable'
 
+sudo_policy_denied() {
+    local account=$1 policy
+    if ! policy=$(sudo -n -l -U "$account" 2>&1); then
+        return 1
+    fi
+    grep -Fq "User $account is not allowed to run sudo" <<<"$policy"
+}
+
 getent passwd "$HERMES_USER" >/dev/null || die "Hermes account is missing: $HERMES_USER"
 getent passwd "$ADMIN_USER" >/dev/null || die "operator account is missing: $ADMIN_USER"
 admin_uid=$(id -u "$ADMIN_USER")
@@ -81,12 +89,32 @@ runuser -u "$ADMIN_USER" -- sudo -n true || die 'operator non-interactive sudo p
 if id -nG "$HERMES_USER" | tr ' ' '\n' | grep -qx sudo; then
     die 'Hermes remains in the sudo group'
 fi
-if ! hermes_sudo_policy=$(sudo -n -l -U "$HERMES_USER" 2>&1) \
-    || ! grep -Fq "User $HERMES_USER is not allowed to run sudo" <<<"$hermes_sudo_policy"; then
+if ! sudo_policy_denied "$HERMES_USER"; then
     die 'Hermes has an effective sudo policy'
 fi
 if runuser -u "$HERMES_USER" -- sudo -n true >/dev/null 2>&1; then
     die 'Hermes still has non-interactive sudo access'
+fi
+
+uid_min=1000
+configured_uid_min=$(awk '$1 == "UID_MIN" && $2 ~ /^[0-9]+$/ { print $2; exit }' /etc/login.defs 2>/dev/null || true)
+[[ -z "$configured_uid_min" ]] || uid_min=$configured_uid_min
+unexpected_sudo_users=()
+if ! passwd_entries=$(getent passwd); then
+    die 'unable to enumerate the passwd database for administrator audit'
+fi
+while IFS=: read -r account _ uid _ _ _ shell; do
+    [[ "$account" == root || "$account" == "$ADMIN_USER" || "$account" == "$HERMES_USER" ]] && continue
+    [[ "$uid" =~ ^[0-9]+$ && "$uid" -ge "$uid_min" ]] || continue
+    [[ "$shell" != /usr/sbin/nologin && "$shell" != /bin/false ]] || continue
+    if ! sudo_policy_denied "$account"; then
+        unexpected_sudo_users+=("$account")
+    fi
+done <<<"$passwd_entries"
+printf 'administrative_users=root,%s\n' "$ADMIN_USER"
+if ((${#unexpected_sudo_users[@]} > 0)); then
+    printf 'unexpected_sudo_users=%s\n' "$(IFS=,; printf '%s' "${unexpected_sudo_users[*]}")"
+    die 'unexpected sudo-capable non-system accounts found; review them without automatic removal'
 fi
 
 command -v sshd >/dev/null 2>&1 || die 'sshd is unavailable'
