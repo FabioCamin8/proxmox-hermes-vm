@@ -299,3 +299,13 @@ Status: NOT TESTED
 - independent human visual confirmation through the Proxmox noVNC console;
 - an authenticated browser task or a destructive Hermes task;
 - destructive rollback or migration paths.
+
+## Reviewer availability
+
+Terra review: NOT AVAILABLE
+
+Finding: Terra was not available as a configured OpenCode reviewer. OpenCode
+1.18.23 was present locally, but its configuration exposed no Terra model or
+reviewer route; no OpenCode configuration was changed and Terra was not
+installed. Sol independently reviewed the final implementation and returned
+an explicit `PASS`.
