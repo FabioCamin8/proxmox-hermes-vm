@@ -1,0 +1,15 @@
+[Unit]
+Description=Encrypted Hermes state backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/hermes-backup/backup.env
+ExecStart=/usr/local/libexec/backup-hermes-state.sh --env /etc/hermes-backup/backup.env
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/tmp
+

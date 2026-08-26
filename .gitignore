@@ -1,5 +1,6 @@
 # Local configuration and credentials
 config/local.env
+config/backup.local.env
 *.local.env
 *.pub
 *.pem
