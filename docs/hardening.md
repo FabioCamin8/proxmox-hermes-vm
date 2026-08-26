@@ -120,8 +120,9 @@ configuration is refused.
 `scripts/validate-hardening.sh` is read-only. It checks the operator account,
 key file shape and permissions, managed sudo policy, Hermes' effective sudo
 denial and failed sudo path, effective SSH policy, LLMNR/DNS, optional
-nftables ownership and exact policy persistence, gateway activity when a
-gateway has been configured, and loopback CDP. A pristine
+nftables ownership and exact policy persistence, the effective administrative
+user audit, gateway activity when a gateway has been configured, and loopback
+CDP. A pristine
 official Hermes install reports `gateway=NOT_CONFIGURED`; an installed but
 inactive gateway remains a validation failure. Run provider and graphical smoke tests from the
 actual Hermes SSH session, where the captured XFCE environment is available:
