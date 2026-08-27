@@ -20,7 +20,7 @@ require_root
 
 HERMES_USER=${HERMES_USER:-hermes}
 ENABLE_GUI=${ENABLE_GUI:-true}
-ENABLE_AUTOLOGIN=${ENABLE_AUTOLOGIN:-false}
+ENABLE_AUTOLOGIN=${ENABLE_AUTOLOGIN:-true}
 ENABLE_VISIBLE_CHROMIUM=${ENABLE_VISIBLE_CHROMIUM:-true}
 CDP_ADDRESS=${CDP_ADDRESS:-127.0.0.1}
 CDP_PORT=${CDP_PORT:-9222}
@@ -44,7 +44,12 @@ getent passwd "$HERMES_USER" >/dev/null || die "user does not exist: $HERMES_USE
 user_home=$(getent passwd "$HERMES_USER" | cut -d: -f6)
 [[ -n "$user_home" && -d "$user_home" ]] || die "home directory is unavailable: $user_home"
 
+package_installed() {
+    [[ "$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null || true)" == 'install ok installed' ]]
+}
+
 packages=(
+    linux-image-amd64
     qemu-guest-agent
     xorg
     xfce4
@@ -56,13 +61,14 @@ packages=(
     xfce4-power-manager
     x11-utils
     x11-xserver-utils
+    xinput
     wmctrl
     chromium
 )
 
 missing=()
 for package in "${packages[@]}"; do
-    if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q '^install ok installed$'; then
+    if ! package_installed "$package"; then
         missing+=("$package")
     fi
 done
@@ -71,6 +77,16 @@ if ((${#missing[@]} > 0)); then
     env DEBIAN_FRONTEND=noninteractive apt-get update
     env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
 fi
+
+# Install the standard kernel before removing only the cloud meta-package. Do not autoremove:
+# the cloud kernel may still be running until the next boot.
+package_installed linux-image-amd64 \
+    || die 'linux-image-amd64 is not installed; refusing to continue'
+if package_installed linux-image-cloud-amd64; then
+    env DEBIAN_FRONTEND=noninteractive apt-get purge -y linux-image-cloud-amd64
+fi
+! package_installed linux-image-cloud-amd64 \
+    || die 'linux-image-cloud-amd64 is still installed after kernel transition'
 
 lightdm_dropin=/etc/lightdm/lightdm.conf.d/50-hermes-session.conf
 install -d -m 0755 /etc/lightdm/lightdm.conf.d

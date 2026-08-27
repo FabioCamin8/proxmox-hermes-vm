@@ -16,11 +16,11 @@ CDP_PORT=${CDP_PORT:-9222}
 [[ "$CDP_ADDRESS" == 127.0.0.1 ]] || die 'CDP_ADDRESS must remain 127.0.0.1'
 [[ "$CDP_PORT" =~ ^[0-9]+$ && "$CDP_PORT" -ge 1 && "$CDP_PORT" -le 65535 ]] || die 'invalid CDP_PORT'
 
-for command_name in dpkg-query loginctl pgrep tr awk curl ss wmctrl systemctl; do
+for command_name in dpkg-query loginctl pgrep tr awk curl ss wmctrl systemctl xdpyinfo xinput; do
     command -v "$command_name" >/dev/null 2>&1 || die "required command is unavailable: $command_name"
 done
 
-packages=(qemu-guest-agent xorg xfce4 lightdm lightdm-gtk-greeter dbus-x11 at-spi2-core x11-utils x11-xserver-utils wmctrl chromium)
+packages=(qemu-guest-agent xorg xfce4 lightdm lightdm-gtk-greeter dbus-x11 at-spi2-core x11-utils x11-xserver-utils xinput wmctrl chromium)
 for package in "${packages[@]}"; do
     status=$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)
     [[ "$status" == 'install ok installed' ]] || die "package is not installed: $package ($status)"
@@ -112,6 +112,26 @@ canonical_display() {
     printf '%s' "$value"
 }
 
+screen_geometry=$(run_graphical xdpyinfo | awk '/dimensions:/{print $2; exit}' || true)
+[[ "$screen_geometry" =~ ^[0-9]+x[0-9]+$ ]] \
+    || die "X11 screen dimensions are unavailable: $screen_geometry"
+screen_width=${screen_geometry%x*}
+screen_height=${screen_geometry#*x}
+((screen_width >= 640 && screen_height >= 480)) \
+    || die "X11 screen dimensions are too small: $screen_geometry"
+printf 'x11_resolution=%s\n' "$screen_geometry"
+
+input_devices=$(run_graphical xinput list)
+qemu_tablet=$(grep -Ei 'QEMU.*USB Tablet' <<<"$input_devices" | head -n 1 || true)
+[[ -n "$qemu_tablet" ]] || die 'QEMU USB Tablet is not present in X11 input enumeration'
+[[ "$qemu_tablet" =~ [Pp]ointer ]] || die 'QEMU USB Tablet is not enumerated as a pointer'
+! [[ "$qemu_tablet" =~ [Xx][Tt][Ee][Ss][Tt] ]] || die 'QEMU USB Tablet resolved to an XTEST device'
+printf 'qemu_tablet=%s\n' "$qemu_tablet"
+keyboard_device=$(grep -Ei '\[slave[[:space:]]+keyboard' <<<"$input_devices" \
+    | grep -Eiv 'XTEST' | head -n 1 || true)
+[[ -n "$keyboard_device" ]] || die 'no non-XTEST X11 keyboard device is present'
+printf 'x11_keyboard=%s\n' "$keyboard_device"
+
 run_graphical dbus-send --session --print-reply --dest=org.a11y.Bus /org/a11y/bus \
     org.freedesktop.DBus.Introspectable.Introspect >/dev/null \
     || die 'AT-SPI D-Bus service is not reachable'
@@ -141,8 +161,12 @@ cdp_json=$(curl --fail --silent --show-error "http://$CDP_ADDRESS:$CDP_PORT/json
 grep -q 'webSocketDebuggerUrl' <<<"$cdp_json" || die 'CDP response is incomplete'
 listeners=$(ss -H -ltn "sport = :$CDP_PORT")
 grep -Eq "127\\.0\\.0\\.1:$CDP_PORT" <<<"$listeners" || die 'CDP is not listening on IPv4 loopback'
-! grep -Eq "(^|[[:space:]])(0\\.0\\.0\\.0|\\*|\\[::\\]|::):$CDP_PORT([[:space:]]|$)" <<<"$listeners" \
-    || die 'CDP is listening beyond loopback'
+while read -r _ _ _ local_address _; do
+    case "$local_address" in
+        "127.0.0.1:$CDP_PORT"|"[::1]:$CDP_PORT") ;;
+        *) die "CDP is listening beyond loopback: $local_address" ;;
+    esac
+done <<<"$listeners"
 
 windows=$(run_graphical wmctrl -l -p 2>/dev/null || true)
 grep -qi 'chromium' <<<"$windows" || die 'Chromium has no mapped X11 window'

@@ -185,6 +185,8 @@ printf '%s\n' \
     "DISK_SIZE_GB=$DISK_SIZE_GB" \
     "MACHINE=$MACHINE" \
     "BIOS=$BIOS" \
+    'VGA=virtio' \
+    'TABLET=1' \
     "CI_USER=$CI_USER" \
     "IMAGE_URL=$IMAGE_URL" \
     "IMAGE_CHECKSUM_URL=$IMAGE_CHECKSUM_URL" \
@@ -220,7 +222,8 @@ qm create "$VMID" \
     --net0 "$net_config" \
     --agent 1 \
     --serial0 socket \
-    --vga std \
+    --vga virtio \
+    --tablet 1 \
     --efidisk0 "$STORAGE:0,efitype=4m,pre-enrolled-keys=0" \
     --onboot 0
 
@@ -260,8 +263,10 @@ grep -Eq '^agent: 1$' <<<"$final_config" \
     || die 'final qm config does not enable the QEMU Guest Agent option'
 grep -Eq '^serial0: socket$' <<<"$final_config" \
     || die 'final qm config does not expose a serial console'
-grep -Eq '^vga: std$' <<<"$final_config" \
-    || die 'final qm config does not expose a graphical display'
+grep -Eq '^vga: virtio$' <<<"$final_config" \
+    || die 'final qm config does not use VirtIO graphics'
+grep -Eq '^tablet: 1$' <<<"$final_config" \
+    || die 'final qm config does not enable the QEMU tablet'
 
 start_state=stopped
 if [[ "$START_VM" == 1 ]]; then
