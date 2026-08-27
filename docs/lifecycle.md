@@ -18,7 +18,10 @@ storage plugins.
 - Debian GNU/Linux 13 genericcloud amd64 guest.
 - Cloud-Init 25.1.4.
 - q35 machine, OVMF firmware, host CPU, VirtIO networking, and
-  virtio-scsi-single storage.
+  virtio-scsi-single storage, with `vga: virtio` and `tablet: 1` for the
+  graphical console.
+- `linux-image-amd64` installed as the tracked standard kernel and
+  `linux-image-cloud-amd64` meta-package absent after the graphical bootstrap.
 - Cloud-Init user data used DHCP and public-key SSH. The image was downloaded
   from the official Debian source and verified against its SHA512 manifest
   before import.
@@ -46,7 +49,8 @@ provider credential or browser login was added.
 5. Apply guest runtime changes in order: desktop, Hermes, operator account,
    fresh operator SSH proof, Hermes privilege removal, network policy, fresh
    SSH proof, and firewall finalization.
-6. Run `validate-runtime.sh` from the fresh operator session, then perform one
+6. Reboot after the desktop bootstrap so the standard kernel becomes active.
+7. Run `validate-runtime.sh` from the fresh operator session, then perform one
    controlled guest reboot and run the validator again.
 
 For a later Hermes upgrade, select and review a new official commit, rerun the

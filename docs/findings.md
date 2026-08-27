@@ -103,6 +103,23 @@ format conversion was needed.
 Implication: preserve exact storage references and treat backend-specific
 optimizations as recommendations.
 
+## Graphical console input compatibility
+
+Status: VERIFIED from the live graphical Hermes VM finding used for this
+template update
+
+Finding: q35/OVMF with `vga: virtio` and `tablet: 1` produced usable Proxmox
+noVNC video and manually validated pointer movement/clicking. The Debian cloud
+kernel did not provide `usbhid` or `xhci_pci`, so X11 exposed only XTEST pointer
+devices.
+After installing and booting the standard `linux-image-amd64` kernel, both
+modules were loadable and kernel/input enumeration reported the QEMU USB
+Tablet; `xinput` then showed it as a non-XTEST pointer.
+
+Implication: the graphical path retains the cloud image and Cloud-Init but
+tracks the standard Debian kernel. It does not require VirGL, GPU passthrough,
+or 3D acceleration.
+
 ## MTU
 
 Status: VERIFIED for one network path

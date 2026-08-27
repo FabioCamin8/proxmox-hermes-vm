@@ -10,13 +10,41 @@ expected_hostname=${EXPECTED_HOSTNAME:-hermes-agent}
 expected_user=${EXPECTED_USER:-hermes}
 expected_mtu=${EXPECTED_MTU:-}
 
-for command_name in cloud-init hostname ip systemctl; do
+for command_name in cloud-init dpkg-query hostname ip modprobe sudo systemctl uname; do
     command -v "$command_name" >/dev/null 2>&1 || die "required guest command is unavailable: $command_name"
 done
 
 actual_hostname=$(hostname -s)
 [[ "$actual_hostname" == "$expected_hostname" ]] || die "hostname mismatch: expected $expected_hostname, got $actual_hostname"
 grep -Eq '^VERSION_ID="?13' /etc/os-release || die "guest is not Debian 13"
+
+package_installed() {
+    [[ "$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null || true)" == 'install ok installed' ]]
+}
+
+running_kernel=$(uname -r)
+[[ "$running_kernel" != *-cloud-amd64 ]] \
+    || die "the running kernel is still the Debian cloud kernel: $running_kernel"
+package_installed linux-image-amd64 \
+    || die 'linux-image-amd64 is not installed'
+! package_installed linux-image-cloud-amd64 \
+    || die 'linux-image-cloud-amd64 meta-package is still installed'
+printf '%s\n' \
+    "running_kernel=$running_kernel" \
+    'linux-image-amd64=installed' \
+    'linux-image-cloud-amd64=absent'
+
+for module in usbhid xhci_pci; do
+    sudo -n modprobe --dry-run "$module" \
+        || die "kernel module is unavailable or not loadable: $module"
+    printf 'kernel_module=%s loadable\n' "$module"
+done
+
+input_devices=/proc/bus/input/devices
+[[ -r "$input_devices" ]] || die 'kernel input enumeration is unavailable'
+grep -Eq 'QEMU( QEMU)? USB Tablet' "$input_devices" \
+    || die 'QEMU USB Tablet is absent from kernel input enumeration'
+printf '%s\n' 'qemu_usb_tablet=present in kernel input enumeration'
 
 cloud_init_exit=0
 if cloud_init_status=$(cloud-init status --long); then

@@ -8,7 +8,8 @@ not an assertion that other patch releases are unsupported.
 
 The validated VM used q35, OVMF, host CPU type, 4 vCPUs, 8192 MiB RAM, a
 VirtIO NIC, a SCSI boot disk, a dedicated Cloud-Init drive, a serial console,
-and the Proxmox QEMU Guest Agent option. The boot disk retained its original
+the Proxmox QEMU Guest Agent option, `vga: virtio`, and `tablet: 1`. The boot
+disk retained its original
 storage volume reference and used `virtio-scsi-single`, `discard=on`,
 `ssd=on`, and `iothread=on`; no cache property was added.
 
@@ -25,6 +26,10 @@ storage volume reference and used `virtio-scsi-single`, `discard=on`,
 7. Validate SSH key access before SSH hardening.
 
 The scripts refuse an occupied VMID and never delete or recreate a VM.
+
+For an already-created VM, run `scripts/validate-pve.sh --existing
+config/local.env`. This reads the live `qm config` and makes no changes; it
+asserts the graphical contract of q35, OVMF, `vga: virtio`, and `tablet: 1`.
 
 ## Creation
 
@@ -60,8 +65,15 @@ scsi1: <CLOUD_INIT_VOLUME>,media=cdrom
 net0: virtio=<GENERATED_MAC>,bridge=<BRIDGE>
 serial0: socket
 agent: 1
+vga: virtio
+tablet: 1
 boot: order=scsi0
 ```
+
+`vga: virtio` keeps the noVNC framebuffer usable for this 2D desktop and
+`tablet: 1` exposes the QEMU USB Tablet for accurate console pointer input.
+The template intentionally does not use VirGL, GPU passthrough, or 3D
+acceleration.
 
 The placeholder values must come from current Proxmox inspection. Storage
 backends differ, so scripts must not guess a volume name, format, or cache
@@ -103,3 +115,13 @@ settings, so a secure deployment must verify the non-root key path and apply
 an explicit hardening drop-in afterward. Its error cleanup can destroy the
 selected VMID. These behaviors are documented findings, not defaults that
 this repository silently inherits.
+
+## Existing VM migration note
+
+Older graphical guests may show corrupted standard-VGA noVNC output, no
+noVNC mouse input, or only an XTEST pointer in `xinput`. For an already
+identified VM, set `vga: virtio` and retain `tablet: 1`, install and boot the
+standard `linux-image-amd64` kernel, and remove the
+`linux-image-cloud-amd64` meta-package only after the standard kernel boot is
+proven. Do not pin a specific kernel version or modify the protected live VM
+without the normal identity and backup checks.

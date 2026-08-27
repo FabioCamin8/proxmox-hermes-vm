@@ -7,6 +7,10 @@ layers:
 2. The desktop layer starts Debian Chromium in XFCE for a visible, persistent
    session and exposes a local CDP transport.
 
+Computer Use is different: it attaches through `hermes-graphical` to the
+actual X11/AT-SPI desktop and therefore controls the same Chromium window an
+operator can see in the Proxmox noVNC console.
+
 Do not use a normal personal Chromium profile for automation and do not
 configure Browserbase, Browser Use cloud services, or browser logins in this
 repository.
@@ -34,6 +38,38 @@ starts `/usr/bin/chromium` with:
 The profile is separate from any default Chromium profile. The helper never
 adds `--no-sandbox`; the Debian Chromium sandbox remains responsible for its
 normal isolation.
+
+## Visible browser / Computer Use workflow
+
+The graphical bootstrap defaults to `ENABLE_AUTOLOGIN=true`, so this VM is
+ready for manual console interaction after reboot. Set it to `false` only when
+the LightDM greeter should remain in front. Then:
+
+1. Open the VM's Proxmox noVNC console and confirm that XFCE/X11 and the
+   visible Chromium window are available.
+2. In that Chromium window, manually perform actions that should remain under
+   operator control: website login, MFA, consent/cookie dialogs,
+   CAPTCHA/manual verification where applicable, and account selection.
+3. Leave the visible browser running unless there is a reason to close it.
+   Its state is stored in the dedicated persistent profile and survives reboot
+   on the VM's persistent filesystem.
+4. From SSH as `hermes`, use:
+
+   ```bash
+   hermes-graphical hermes
+   ```
+
+   For diagnostics, use:
+
+   ```bash
+   hermes-graphical hermes computer-use doctor
+   ```
+
+The `hermes` account owns Hermes, Chromium, the profile, and Computer Use.
+Use `ops` for apt, kernel/package administration, systemd/system services, and
+`/etc`; keep `hermes` without sudo access. Browser credentials and
+authenticated site state are deliberately operator-owned and are never part of
+this public template.
 
 ## CDP validation
 

@@ -6,8 +6,21 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/common.sh
 source "$script_dir/lib/common.sh"
 
-[[ $# -eq 1 ]] || die "usage: validate-pve.sh ENV_FILE"
-load_env "$1"
+usage() {
+    printf '%s\n' 'Usage: validate-pve.sh [--existing] ENV_FILE'
+}
+
+existing_vm=false
+if [[ $# -eq 1 ]]; then
+    env_file=$1
+elif [[ $# -eq 2 && $1 == --existing ]]; then
+    existing_vm=true
+    env_file=$2
+else
+    usage >&2
+    exit 2
+fi
+load_env "$env_file"
 
 for name in VMID STORAGE BRIDGE MACHINE BIOS; do
     require_var "$name"
@@ -33,12 +46,19 @@ pvesm status --storage "$STORAGE" --content images | awk -v storage="$STORAGE" '
 ip link show "$BRIDGE" >/dev/null 2>&1 \
     || die "bridge does not exist on this node: $BRIDGE"
 
+vm_config=
 if qm config "$VMID" >/dev/null 2>&1; then
-    die "VMID $VMID is already occupied"
+    if [[ "$existing_vm" == true ]]; then
+        vm_config=$(qm config "$VMID")
+    else
+        die "VMID $VMID is already occupied"
+    fi
+elif [[ "$existing_vm" == true ]]; then
+    die "VMID $VMID does not exist"
 fi
 
-[[ "$MACHINE" == q35 ]] || printf 'warning: MACHINE=%s is not q35\n' "$MACHINE" >&2
-[[ "$BIOS" == ovmf ]] || printf 'warning: BIOS=%s is not ovmf\n' "$BIOS" >&2
+[[ "$MACHINE" == q35 ]] || die 'MACHINE must be q35 for the graphical VM'
+[[ "$BIOS" == ovmf ]] || die 'BIOS must be ovmf for the graphical VM'
 
 if [[ -z ${SSH_PUBLIC_KEY_FILE:-} ]]; then
     printf '%s\n' 'warning: SSH_PUBLIC_KEY_FILE is not set; key validation deferred' >&2
@@ -51,9 +71,25 @@ else
         || die "SSH_PUBLIC_KEY_FILE is not a valid public key"
 fi
 
+if [[ "$existing_vm" == true ]]; then
+    for required_setting in \
+        'machine: q35' \
+        'bios: ovmf' \
+        'vga: virtio' \
+        'tablet: 1'; do
+        grep -Fxq -- "$required_setting" <<<"$vm_config" \
+            || die "existing VM config is missing required setting: $required_setting"
+    done
+    printf '%s\n' \
+        'PVE configuration validation passed; this script made no changes.' \
+        "VMID $VMID config has machine=q35 bios=ovmf vga=virtio tablet=1."
+    exit 0
+fi
+
 printf '%s\n' \
     "PVE validation passed; this script made no changes." \
     "VMID $VMID is available." \
     "Storage $STORAGE is active." \
     "Bridge $BRIDGE exists." \
-    "Machine/firmware request: $MACHINE/$BIOS."
+    "Machine/firmware request: $MACHINE/$BIOS." \
+    'Graphical device request: vga=virtio tablet=1.'

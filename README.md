@@ -57,6 +57,8 @@ cp config/example.env config/local.env
 ./scripts/validate-pve.sh config/local.env
 ./scripts/create-vm.sh --dry-run config/local.env
 ./scripts/create-vm.sh --apply config/local.env
+# For an already-created VM, inspect its live graphical settings read-only:
+./scripts/validate-pve.sh --existing config/local.env
 ```
 
 `--apply` is the explicit mutation acknowledgement. It verifies the official
@@ -71,15 +73,15 @@ runtime scripts inside the guest:
 
 ```bash
 sudo ./scripts/bootstrap-desktop.sh
-sudo env ENABLE_AUTOLOGIN=true ./scripts/bootstrap-desktop.sh
 sudo env HERMES_COMMIT=<official-hermes-commit> ./scripts/bootstrap-hermes.sh
 ```
 
-The first desktop command keeps LightDM autologin disabled. Enable autologin
-only when an unattended graphical session is an explicit requirement. Create
-the separate operator account, prove a fresh operator SSH session, and then
-remove Hermes' sudo access with [docs/hardening.md](docs/hardening.md). The
-final aggregate validator is run from that fresh `ops` session:
+The desktop bootstrap enables LightDM autologin by default so the XFCE/X11
+session and visible browser are available through noVNC after reboot. Set
+`ENABLE_AUTOLOGIN=false` when a local greeter is preferred. Create the
+separate operator account, prove a fresh operator SSH session, and then remove
+Hermes' sudo access with [docs/hardening.md](docs/hardening.md). The final
+aggregate validator is run from that fresh `ops` session:
 
 ```bash
 ./scripts/validate-runtime.sh --env /path/to/private-hardening.env
@@ -88,6 +90,21 @@ final aggregate validator is run from that fresh `ops` session:
 See [docs/desktop.md](docs/desktop.md), [docs/browser.md](docs/browser.md),
 and [docs/hermes.md](docs/hermes.md) for the verified boundaries and known
 Debian/XFCE behavior.
+
+## Visible browser / Computer Use workflow
+
+The graphical path retains the Debian cloud image and Cloud-Init while using
+the standard Debian kernel for noVNC input. For a desktop that is ready after
+reboot, run:
+
+```bash
+sudo ./scripts/bootstrap-desktop.sh
+```
+
+Autologin is enabled by default for this graphical workflow; set
+`ENABLE_AUTOLOGIN=false` to keep the LightDM greeter. The complete noVNC ->
+persistent Chromium -> same X11 Computer Use operator sequence, including the
+`hermes`/`ops` boundary, is in [docs/browser.md](docs/browser.md).
 
 ## Configuration
 
@@ -111,6 +128,7 @@ it. The scripts do not modify a bridge or physical interface.
 - 64 GiB SCSI boot disk;
 - `virtio-scsi-single`, `discard=on`, SSD emulation when appropriate, and
   IO thread enabled;
+- `vga: virtio` and `tablet: 1` for the Proxmox noVNC console;
 - VirtIO NIC on the selected bridge;
 - Cloud-Init drive and serial console;
 - Proxmox QEMU Guest Agent option enabled, with the guest package verified
@@ -169,7 +187,9 @@ hardened. The aggregate acceptance proof includes:
   package/service;
 - effective administrator audit with no unexpected sudo-capable non-system
   accounts;
-- XFCE/X11, AT-SPI, Chromium, loopback-only CDP, Hermes, and Computer Use;
+- standard Debian kernel with loadable `usbhid`/`xhci_pci` input support;
+- XFCE/X11 resolution, QEMU USB Tablet input, AT-SPI, Chromium,
+  loopback-only CDP, Hermes, and Computer Use;
 - `ops` administrative access and no Hermes sudo access.
 
 ## Known quirks

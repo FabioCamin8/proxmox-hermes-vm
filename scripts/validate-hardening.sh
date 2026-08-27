@@ -229,8 +229,12 @@ fi
 cdp_listeners=$(ss -H -ltn "sport = :$CDP_PORT")
 grep -Eq "127\.0\.0\.1:$CDP_PORT" <<<"$cdp_listeners" \
     || die 'CDP is not listening on IPv4 loopback'
-! grep -Eq "(^|[[:space:]])(0\.0\.0\.0|\*|\[::\]|::):$CDP_PORT([[:space:]]|$)" <<<"$cdp_listeners" \
-    || die 'CDP is listening beyond loopback'
+while read -r _ _ _ local_address _; do
+    case "$local_address" in
+        "127.0.0.1:$CDP_PORT"|"[::1]:$CDP_PORT") ;;
+        *) die "CDP is listening beyond loopback: $local_address" ;;
+    esac
+done <<<"$cdp_listeners"
 curl --fail --silent --show-error "http://$CDP_ADDRESS:$CDP_PORT/json/version" >/dev/null \
     || die 'CDP endpoint is not responding'
 

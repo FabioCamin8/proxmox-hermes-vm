@@ -11,19 +11,20 @@ console and reached by Hermes Computer Use.
 ```text
 HERMES_USER=hermes
 ENABLE_GUI=true
-ENABLE_AUTOLOGIN=false
+ENABLE_AUTOLOGIN=true
 ENABLE_VISIBLE_CHROMIUM=true
 CDP_ADDRESS=127.0.0.1
 CDP_PORT=9222
 ```
 
-Autologin is intentionally opt-in. An unattended Computer Use deployment can
-enable it explicitly after reviewing the local security boundary:
+Autologin is enabled by default so the graphical session is ready for the
+Proxmox noVNC workflow after reboot. Set it to `false` when a greeter is
+preferred:
 
 ```bash
 sudo env \
   HERMES_USER=hermes \
-  ENABLE_AUTOLOGIN=true \
+  ENABLE_AUTOLOGIN=false \
   ENABLE_VISIBLE_CHROMIUM=true \
   CDP_ADDRESS=127.0.0.1 \
   CDP_PORT=9222 \
@@ -37,6 +38,7 @@ Proxmox host, bridge, storage pool, or other guest.
 
 The tested explicit package set is:
 
+- `linux-image-amd64`
 - `qemu-guest-agent`
 - `xorg`
 - `xfce4`
@@ -44,11 +46,20 @@ The tested explicit package set is:
 - `dbus-x11` and `dbus-user-session`
 - `at-spi2-core`
 - `xfce4-power-manager`
-- `x11-utils`, `x11-xserver-utils`, and `wmctrl`
+- `x11-utils`, `x11-xserver-utils`, `xinput`, and `wmctrl`
 - `chromium`
 
 The bootstrap uses `--no-install-recommends` and does not install
 `xfce4-goodies`, GNOME, KDE, Docker, or a standalone VNC server.
+
+The guest still comes from the Debian generic cloud image and keeps
+Cloud-Init and its cloud filesystem. `linux-image-amd64` is installed as the
+tracked standard-kernel meta-package because the graphical VM needs Debian's
+normal USB/HID and X11 input modules. The bootstrap verifies that package,
+then removes only `linux-image-cloud-amd64`; it does not autoremove kernels or
+pin a version-specific GRUB entry. The standard package's normal Debian
+kernel/GRUB lifecycle selects the kernel on the next boot. Reboot before
+running the guest/runtime validators.
 
 The QEMU Guest Agent unit is `static` on Debian 13. The script starts it; it
 does not claim that a static unit can be enabled. Proxmox `agent: 1` and the
@@ -103,8 +114,11 @@ HERMES_USER=hermes REQUIRE_AUTOLOGIN=true ./scripts/validate-desktop.sh
 
 It checks package state, QEMU Guest Agent, graphical target, LightDM, the
 actual `loginctl` session, X11 `DISPLAY`, XFCE processes, AT-SPI D-Bus, the
-mapped Chromium window, CDP loopback binding, and systemd-user environment
-import. It does not treat an Xorg process alone as proof of a rendered GUI.
+X11 screen dimensions, the QEMU USB Tablet as a non-XTEST pointer, a non-XTEST
+keyboard, the mapped Chromium window, CDP loopback binding, and systemd-user
+environment import. It does not treat an Xorg process alone as proof of a
+rendered GUI. The guest validator separately proves the running standard
+kernel and `usbhid`/`xhci_pci` loadability.
 
 Human-visible confirmation through the Proxmox console remains a useful
 operator acceptance step; the automated proof includes a mapped X11 window and
